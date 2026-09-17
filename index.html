@@ -417,6 +417,12 @@
   }
   .admin-tab:hover{background:rgba(var(--adm-fg-rgb),.05);color:rgba(var(--adm-fg-rgb),.85);}
   .admin-tab-icon{font-size:15px;}
+  .admin-tab-badge{
+    display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;
+    padding:0 4px;border-radius:9px;background:#ff3b30;color:#fff;font-size:10.5px;font-weight:800;
+    margin-left:2px;line-height:1;
+  }
+  .admin-tab-badge:empty{display:none;}
   .admin-tab.active{background:#0a7cff;color:#fff;border-color:#0a7cff;box-shadow:0 2px 10px rgba(10,124,255,.35);}
   .admin-body{padding:28px 32px 90px;max-width:1240px;margin:0 auto;}
   .admin-body.admin-body-wide{max-width:1760px;}
@@ -1161,6 +1167,7 @@
   const orders = {};       // orderId -> order record
   const customers = {};    // email -> {name, email, address}
   const hoursLog = [];     // {orderId, groupKey, monteur, hours, date}
+  const ferienMain = [];   // {id, monteur, von, bis, art} — 'ferien' | 'krankheit'
   const invoices = [];     // {id, orderId, gkey, amount, kind:'akonto'|'final', sentDate, dueDate, paid, paidDate}
   const monteure = [];      // {name, phone, role, photo, email} — managed under Einstellungen
   const partners = [];      // {name, role, photo, email} — managed under Einstellungen, shown on the public Team page
@@ -1282,13 +1289,36 @@
     if(!fsReady) return;
     db.collection('meta').doc('monteure').set({ list: monteure }).catch(e=>console.warn('fsSaveMonteure', e));
   }
+  function fsSaveFerienMain(f){
+    if(!fsReady) return;
+    db.collection('ferienMain').doc(f.id).set(f).catch(e=>console.warn('fsSaveFerienMain', e));
+  }
+  function fsDeleteFerienMain(id){
+    ferienMain.forEach((f,i)=>{ if(f.id===id) ferienMain.splice(i,1); });
+    if(!fsReady) return;
+    db.collection('ferienMain').doc(id).delete().catch(e=>console.warn('fsDeleteFerienMain', e));
+  }
+  function fsAdjustHoursEntry(idx, newHours){
+    if(idx<0 || idx>=hoursLog.length) return;
+    const entry = hoursLog[idx];
+    entry.hours = newHours;
+    if(!fsReady || !entry.fsId) return;
+    const coll = entry.source==='kalender' ? 'hours_froh-tech' : 'hoursLog';
+    db.collection(coll).doc(entry.fsId).update({ hours:newHours }).catch(e=>console.warn('fsAdjustHoursEntry', e));
+  }
   function fsSavePartners(){
     if(!fsReady) return;
     db.collection('meta').doc('partners').set({ list: partners }).catch(e=>console.warn('fsSavePartners', e));
   }
   function fsSaveSettings(){
     if(!fsReady) return;
-    db.collection('meta').doc('settings').set({ SETTINGS, PRICES, MWST_RATE }).catch(e=>console.warn('fsSaveSettings', e));
+    const settingsToSave = { ...SETTINGS };
+    delete settingsToSave.showcase; // eigenes Dokument (Bilder sonst zu gross für ein Firestore-Dokument)
+    db.collection('meta').doc('settings').set({ SETTINGS: settingsToSave, PRICES, MWST_RATE }).catch(e=>console.warn('fsSaveSettings', e));
+  }
+  function fsSaveShowcase(){
+    if(!fsReady) return Promise.resolve();
+    return db.collection('meta').doc('showcase').set({ items: SETTINGS.showcase }).catch(e=>{ console.warn('fsSaveShowcase', e); throw e; });
   }
   function fsSaveCode(code){
     if(!fsReady) return;
@@ -1353,16 +1383,21 @@
       db.collection('meta').doc('partners').get(),
       db.collection('meta').doc('team').get(),
       db.collection('meta').doc('settings').get(),
+      db.collection('meta').doc('showcase').get(),
+      db.collection('hours_froh-tech').get(),
+      db.collection('ferienMain').get(),
       ...GROUPS.map(g=> db.collection('bookings').doc(g.key).get())
     ]).then(results=>{
-      const [ordersSnap, invSnap, custSnap, hoursSnap, moSnap, objMetaSnap, objCostSnap, manualObjSnap, ferienSnap, contactSnap, monteureDoc, partnersDoc, teamDoc, settingsDoc, ...bookingDocs] = results;
+      const [ordersSnap, invSnap, custSnap, hoursSnap, moSnap, objMetaSnap, objCostSnap, manualObjSnap, ferienSnap, contactSnap, monteureDoc, partnersDoc, teamDoc, settingsDoc, showcaseDoc, kalHoursSnap, ferienMainSnap, ...bookingDocs] = results;
       ordersSnap.forEach(doc=>{ const o = deserializeOrder(doc.data()); orders[o.id] = o; });
       invSnap.forEach(doc=>{
         const d = doc.data();
         invoices.push({ id:d.id, orderId:d.orderId, gkey:d.gkey, objektKey:d.objektKey||null, customerEmail:d.customerEmail||null, customerName:d.customerName||null, customerAddress:d.customerAddress||null, akontoNumber:d.akontoNumber||null, amount:d.amount, kind:d.kind, sentDate:new Date(d.sentDate), dueDate:pdate(d.dueDate), paid:d.paid, paidDate:d.paidDate?pdate(d.paidDate):null });
       });
       custSnap.forEach(doc=>{ customers[doc.id] = doc.data(); });
-      hoursSnap.forEach(doc=>{ const d = doc.data(); hoursLog.push({ orderId:d.orderId, gkey:d.gkey, monteur:d.monteur, hours:d.hours, date:new Date(d.date) }); });
+      hoursSnap.forEach(doc=>{ const d = doc.data(); hoursLog.push({ orderId:d.orderId, gkey:d.gkey, monteur:d.monteur, hours:d.hours, date:new Date(d.date), fsId:doc.id, source:'main' }); });
+      kalHoursSnap.forEach(doc=>{ const d = doc.data(); hoursLog.push({ orderId:d.entryId||'', gkey:null, monteur:d.monteur, hours:d.hours, date:new Date(d.date), fsId:doc.id, source:'kalender', customer:d.customer||'' }); });
+      ferienMainSnap.forEach(doc=> ferienMain.push(doc.data()));
       moSnap.forEach(doc=>{ const d = doc.data(); manualOffers.push({ ...d, createdAt:new Date(d.createdAt) }); });
       objMetaSnap.forEach(doc=>{ const d=doc.data(); objektMaterial[doc.id] = d.materialCost || 0; if(d.status) objektStatus[doc.id] = d.status; });
       objCostSnap.forEach(doc=>{ const d = doc.data(); objektCosts.push({ ...d, date:new Date(d.date) }); });
@@ -1378,6 +1413,7 @@
         if(d.PRICES) Object.assign(PRICES, d.PRICES);
         if(typeof d.MWST_RATE==='number') MWST_RATE = d.MWST_RATE;
       }
+      if(showcaseDoc.exists && showcaseDoc.data().items){ SETTINGS.showcase = showcaseDoc.data().items; }
       GROUPS.forEach((g,i)=>{
         const doc = bookingDocs[i];
         if(doc.exists) groupState[g.key].bookings = doc.data().data || {};
@@ -1401,6 +1437,39 @@
       });
       refreshAdmin();
     }, e=>console.warn('orders listener', e));
+    // ── Rück-Synchronisation: Blockiert- und Zusatz-Meldungen aus dem Froh-Kalender ──
+    db.collection('teams_cal_froh-tech').onSnapshot(snap=>{
+      snap.docChanges().forEach(change=>{
+        if(change.type==='removed') return;
+        const d = change.doc.data();
+        if(!d.auftragsNr) return;
+        const order = orders[d.auftragsNr];
+        const gkey = order ? Object.keys(CAL_TYPE_MAP).find(k=>CAL_TYPE_MAP[k]===d.calType) : null;
+        const g = gkey ? order.groups[gkey] : null;
+        if(order && g){
+          let changed = false;
+          if(d.isBlocked && g.status!=='blocked'){
+            g.status = 'blocked';
+            g.blocked = { text:d.blockReason||'', photo:null, anpassung:false, material:'', preis:0, doneQty:'', reportedBy:'Monteur (Froh-Kalender)', unseen:true };
+            changed = true;
+          }
+          if((d.zusatzQty||0) > 0 && g.zusatzQty !== d.zusatzQty){
+            g.zusatzQty = d.zusatzQty;
+            if(!g.zusatzHandled) g.zusatzUnseen = true;
+            changed = true;
+          }
+          if(changed) fsSaveOrder(order);
+        } else if(!order && d.isBlocked){
+          const mo = manualOffers.find(m=>m.id===d.auftragsNr);
+          if(mo && !mo.blockedUnseen){
+            mo.blockedUnseen = true;
+            mo.blockedReason = d.blockReason||'';
+            fsSaveManualOffer(mo);
+          }
+        }
+      });
+      refreshAdmin();
+    }, e=>console.warn('froh-kalender sync listener', e));
     GROUPS.forEach(g=>{
       db.collection('bookings').doc(g.key).onSnapshot(doc=>{
         if(doc.exists){
@@ -1426,10 +1495,20 @@
       refreshAdmin();
     }, e=>console.warn('customers listener', e));
     db.collection('hoursLog').onSnapshot(snap=>{
-      hoursLog.length = 0;
-      snap.forEach(doc=>{ const d=doc.data(); hoursLog.push({ orderId:d.orderId, gkey:d.gkey, monteur:d.monteur, hours:d.hours, date:new Date(d.date) }); });
+      for(let i=hoursLog.length-1;i>=0;i--) if(hoursLog[i].source==='main') hoursLog.splice(i,1);
+      snap.forEach(doc=>{ const d=doc.data(); hoursLog.push({ orderId:d.orderId, gkey:d.gkey, monteur:d.monteur, hours:d.hours, date:new Date(d.date), fsId:doc.id, source:'main' }); });
       refreshAdmin();
     }, e=>console.warn('hoursLog listener', e));
+    db.collection('hours_froh-tech').onSnapshot(snap=>{
+      for(let i=hoursLog.length-1;i>=0;i--) if(hoursLog[i].source==='kalender') hoursLog.splice(i,1);
+      snap.forEach(doc=>{ const d=doc.data(); hoursLog.push({ orderId:d.entryId||'', gkey:null, monteur:d.monteur, hours:d.hours, date:new Date(d.date), fsId:doc.id, source:'kalender', customer:d.customer||'' }); });
+      refreshAdmin();
+    }, e=>console.warn('kalender hours listener', e));
+    db.collection('ferienMain').onSnapshot(snap=>{
+      ferienMain.length = 0;
+      snap.forEach(doc=> ferienMain.push(doc.data()));
+      refreshAdmin();
+    }, e=>console.warn('ferienMain listener', e));
     db.collection('meta').doc('monteure').onSnapshot(doc=>{
       if(doc.exists){ monteure.length=0; (doc.data().list||[]).forEach(m=>monteure.push(m)); refreshAdmin(); renderTeamGrids(); }
     }, e=>console.warn('monteure listener', e));
@@ -1482,6 +1561,13 @@
         refreshAdmin();
       }
     }, e=>console.warn('settings listener', e));
+    db.collection('meta').doc('showcase').onSnapshot(doc=>{
+      if(doc.exists && doc.data().items){
+        SETTINGS.showcase = doc.data().items;
+        renderOverviewGrid();
+        refreshAdmin();
+      }
+    }, e=>console.warn('showcase listener', e));
   }
 
   /* compress an uploaded photo (e.g. "Blockiert") before storing it locally/remotely */
@@ -2266,6 +2352,8 @@
     if(root) root.classList.toggle('theme-light', adminTheme==='light');
   }
   let auftraegeSubTab = 'laufend'; // 'laufend' | 'blockiert' | 'erledigt'
+  let rechnungenSubTab = 'offen'; // 'offen' | 'mahnungen' | 'bezahlt'
+  let statsMonthCursor = new Date(today.getFullYear(), today.getMonth(), 1);
   let einstellungenCategory = 'firma';
   let adminCalendarOpen = false;
   const searchQuery = { auftraege:'', kunden:'', dashboard:'', rechnungen:'' };
@@ -2911,12 +2999,13 @@
         </div>
         <div class="admin-tabs">
           <button class="admin-tab" data-tab="anfragen"><span class="admin-tab-icon">📥</span>Anfragen</button>
-          <button class="admin-tab" data-tab="kunden"><span class="admin-tab-icon">📁</span>Kunden</button>
-          <button class="admin-tab" data-tab="auftraege"><span class="admin-tab-icon">🛠️</span>Aufträge</button>
+          <button class="admin-tab" data-tab="kunden"><span class="admin-tab-icon">📁</span>Kunden<span class="admin-tab-badge" id="badge-kunden"></span></button>
+          <button class="admin-tab" data-tab="auftraege"><span class="admin-tab-icon">🛠️</span>Aufträge<span class="admin-tab-badge" id="badge-auftraege"></span></button>
           <button class="admin-tab" data-tab="rechnungen"><span class="admin-tab-icon">🧾</span>Rechnungen</button>
           <button class="admin-tab" data-tab="kalender"><span class="admin-tab-icon">📅</span>Kalender</button>
           <button class="admin-tab" data-tab="archiv"><span class="admin-tab-icon">📊</span>Statistik</button>
           <button class="admin-tab" data-tab="dashboard"><span class="admin-tab-icon">💬</span>Nachrichten</button>
+          <button class="admin-tab" data-tab="mitarbeiter"><span class="admin-tab-icon">👷</span>Mitarbeiter</button>
           <button class="admin-tab" data-tab="einstellungen"><span class="admin-tab-icon">⚙️</span>Einstellungen</button>
         </div>
         <div class="admin-body" id="admin-body"></div>
@@ -2939,8 +3028,25 @@
   }
   function renderAdminTabs(){
     $all('.admin-tab').forEach(b=> b.classList.toggle('active', b.dataset.tab===adminTab));
+    updateTabBadges();
   }
-  function refreshAdmin(){ if(adminOpen) renderAdminBody(); }
+  function countUnseenBlocked(){
+    let count = 0;
+    Object.values(orders).forEach(o=> Object.values(o.groups).forEach(g=>{
+      if(g.status==='blocked' && g.blocked && g.blocked.unseen) count++;
+      if(g.zusatzUnseen) count++;
+    }));
+    manualOffers.forEach(mo=>{ if(mo.blockedUnseen) count++; });
+    return count;
+  }
+  function updateTabBadges(){
+    const n = countUnseenBlocked();
+    ['badge-auftraege','badge-kunden'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.textContent = n>0 ? String(n) : '';
+    });
+  }
+  function refreshAdmin(){ if(adminOpen){ renderAdminBody(); updateTabBadges(); } }
 
   function renderAdminBody(){
     const body = $('#admin-body');
@@ -2953,6 +3059,7 @@
     else if(adminTab==='archiv') body.innerHTML = adminArchivHtml();
     else if(adminTab==='kunden') body.innerHTML = adminKundenHtml();
     else if(adminTab==='dashboard') body.innerHTML = adminDashboardHtml();
+    else if(adminTab==='mitarbeiter') body.innerHTML = adminMitarbeiterHtml();
     else if(adminTab==='einstellungen') body.innerHTML = adminEinstellungenHtml();
     wireAdminBody();
   }
@@ -3055,6 +3162,9 @@
       } else if(e.group.status==='done'){
         actions = `<button class="obj-mini admin-act" data-act="akonto">+ Akonto</button>`;
       }
+      if(e.group.zusatzQty>0){
+        actions += `<button class="obj-mini admin-act" data-act="zusatz" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.4);color:#f59e0b;">➕ Mehrpreis (${e.group.zusatzQty})${e.group.zusatzUnseen?' 🔴':''}</button>`;
+      }
       html += `
         <div class="admin-card" data-order="${e.orderId}" data-group="${e.gkey}" style="padding:14px 18px;">
           <div class="admin-row" style="align-items:center;">
@@ -3082,41 +3192,53 @@
   function fmtTime(d){ return d.toLocaleTimeString('de-CH',{hour:'2-digit', minute:'2-digit'}); }
 
   function adminRechnungenHtml(){
-    let list = invoices.filter(i=>!i.paid);
+    let all = invoices.slice();
     const q = searchQuery.rechnungen.trim().toLowerCase();
-    if(q) list = list.filter(i=>{
+    if(q) all = all.filter(i=>{
       const custName = i.gkey ? orders[i.orderId].customer.name : i.customerName;
       const custAddress = i.gkey ? orders[i.orderId].customer.address : i.customerAddress;
       return (custName+' '+custAddress+' '+i.id).toLowerCase().includes(q);
     });
-    list = list.slice().sort((a,b)=> a.sentDate - b.sentDate);
-    let html = `${pageHeaderHtml('🧾','Rechnungen','Offene Akonto- und Schlussrechnungen.')}
-      <input type="text" class="admin-search" id="search-rechnungen" placeholder="Suche nach Kunde oder Rechnungsnr. …" value="${searchQuery.rechnungen}">`;
-    if(!list.length){ html += `<div class="admin-empty">Keine offenen Rechnungen.</div>`; return html; }
+    const offenList = all.filter(i=> !i.paid && !i.mahnungSent && daysRemaining(i.dueDate)>=0);
+    const mahnungList = all.filter(i=> !i.paid && (i.mahnungSent || daysRemaining(i.dueDate)<0));
+    const bezahltList = all.filter(i=> i.paid);
+    const activeList = rechnungenSubTab==='mahnungen' ? mahnungList : rechnungenSubTab==='bezahlt' ? bezahltList : offenList;
+
+    let html = `${pageHeaderHtml('🧾','Rechnungen','Offene Akonto- und Schlussrechnungen, Mahnungen und Zahlungsverlauf.')}
+      <input type="text" class="admin-search" id="search-rechnungen" placeholder="Suche nach Kunde oder Rechnungsnr. …" value="${searchQuery.rechnungen}">
+      <div class="cal-team-filter" style="margin:14px 0 18px;">
+        <button data-rsubtab="offen" class="${rechnungenSubTab==='offen'?'active':''}">Offen (${offenList.length})</button>
+        <button data-rsubtab="mahnungen" class="${rechnungenSubTab==='mahnungen'?'active':''}" style="${rechnungenSubTab==='mahnungen'?'background:#dc3545;border-color:#dc3545;':''}">Mahnungen (${mahnungList.length})</button>
+        <button data-rsubtab="bezahlt" class="${rechnungenSubTab==='bezahlt'?'active':''}" style="${rechnungenSubTab==='bezahlt'?'background:#198754;border-color:#198754;':''}">Bezahlt (${bezahltList.length})</button>
+      </div>`;
+    if(!activeList.length){ html += `<div class="admin-empty">Keine Rechnungen in dieser Ansicht.</div>`; return html; }
+    const sorted = activeList.slice().sort((a,b)=> rechnungenSubTab==='bezahlt' ? (b.paidDate-a.paidDate) : (a.dueDate-b.dueDate));
     html += `<div class="folder-list">`;
-    list.forEach(inv=>{
+    sorted.forEach(inv=>{
       const team = inv.gkey ? orders[inv.orderId].groups[inv.gkey].team : 'Objekt';
       const label = inv.gkey ? orders[inv.orderId].groups[inv.gkey].label : inv.customerAddress;
       const custName = inv.gkey ? orders[inv.orderId].customer.name : inv.customerName;
       const daysLeft = daysRemaining(inv.dueDate);
       const overdue = daysLeft < 0;
       const brutto = Math.round(inv.amount*(1+MWST_RATE)*100)/100;
-      const remainingLabel = overdue ? `${Math.abs(daysLeft)} Tag${Math.abs(daysLeft)!==1?'e':''} überfällig` : `${daysLeft} Tag${daysLeft!==1?'e':''} verbleibend`;
+      const remainingLabel = inv.paid ? `bezahlt am ${fmtHumanLong(inv.paidDate)}` : overdue ? `${Math.abs(daysLeft)} Tag${Math.abs(daysLeft)!==1?'e':''} überfällig` : `${daysLeft} Tag${daysLeft!==1?'e':''} verbleibend`;
       html += `
         <div class="admin-card" data-invoice="${inv.id}" style="padding:14px 18px;">
           <div class="admin-row" style="align-items:center;">
             <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">
               <span class="admin-badge team">${team}</span>
               <span class="admin-badge akonto">${invoiceKindLabel(inv)}</span>
-              ${overdue ? `<span class="admin-badge overdue">${remainingLabel}</span>` : `<span class="folder-meta">${remainingLabel}</span>`}
+              ${inv.paid ? `<span class="admin-badge confirmed">Bezahlt</span>` : overdue ? `<span class="admin-badge overdue">${remainingLabel}</span>` : `<span class="folder-meta">${remainingLabel}</span>`}
+              ${inv.mahnungCount>0 ? `<span class="admin-badge overdue">${inv.mahnungCount}× Mahnung</span>` : ''}
               <span style="font-size:14px;font-weight:600;color:var(--adm-fg);">${inv.id}</span>
               <span class="folder-meta">${label} · ${custName}</span>
               <span class="folder-meta">gesendet ${fmtHumanLong(inv.sentDate)}, ${fmtTime(inv.sentDate)} Uhr · fällig ${fmtHumanLong(inv.dueDate)} · ${chf(brutto)}</span>
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="obj-mini admin-act-invoice" data-act="verlauf">🔍 Verlauf</button>
               <button class="obj-mini admin-act-invoice" data-act="invoice-pdf">PDF ansehen</button>
-              <button class="obj-mini admin-act-invoice" data-act="mahnung">Mahnung senden</button>
-              <button class="obj-mini primary admin-act-invoice" data-act="paid">✓ Bezahlt</button>
+              ${!inv.paid ? `<button class="obj-mini admin-act-invoice" data-act="mahnung">Mahnung senden</button>
+              <button class="obj-mini primary admin-act-invoice" data-act="paid">✓ Bezahlt</button>` : ''}
             </div>
           </div>
         </div>`;
@@ -3125,35 +3247,146 @@
     return html;
   }
 
-  function adminArchivHtml(){
-    let list = invoices.filter(i=>i.paid);
-    list = list.slice().sort((a,b)=> a.paidDate - b.paidDate);
-    let html = `${pageHeaderHtml('📊','Statistik','Bezahlte Rechnungen (weitere Kennzahlen/Bilanzen folgen).')}`;
-    if(!list.length){ html += `<div class="admin-empty">Noch keine bezahlten Rechnungen.</div>`; return html; }
-    html += `<div class="folder-list">`;
-    list.forEach(inv=>{
-      const team = inv.gkey ? orders[inv.orderId].groups[inv.gkey].team : 'Objekt';
-      const label = inv.gkey ? orders[inv.orderId].groups[inv.gkey].label : inv.customerAddress;
-      const custName = inv.gkey ? orders[inv.orderId].customer.name : inv.customerName;
-      const custAddress = inv.gkey ? orders[inv.orderId].customer.address : inv.customerAddress;
-      const brutto = Math.round(inv.amount*(1+MWST_RATE)*100)/100;
-      html += `
-        <div class="admin-card" data-invoice="${inv.id}" style="padding:14px 18px;">
-          <div class="admin-row" style="align-items:center;">
-            <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">
-              <span class="admin-badge team">${team}</span>
-              <span class="admin-badge confirmed">Bezahlt</span>
-              <span style="font-size:14px;font-weight:600;color:var(--adm-fg);">${inv.id} — ${invoiceKindLabel(inv)}</span>
-              <span class="folder-meta">${label} · ${custName} · ${custAddress}</span>
-              <span class="folder-meta">Bezahlt am ${fmtHumanLong(inv.paidDate)} · ${chf(brutto)}</span>
+  function openRechnungVerlaufModal(invId){
+    const inv = invoices.find(i=>i.id===invId);
+    const custName = inv.gkey ? orders[inv.orderId].customer.name : inv.customerName;
+    const brutto = Math.round(inv.amount*(1+MWST_RATE)*100)/100;
+    const steps = [
+      { done:true, label:`Rechnung erstellt & gesendet`, date: inv.sentDate },
+    ];
+    if(inv.mahnungCount>0){ for(let i=0;i<inv.mahnungCount;i++) steps.push({ done:true, label:`Zahlungserinnerung ${i+1} gesendet`, date: i===inv.mahnungCount-1?inv.mahnungDate:null }); }
+    steps.push({ done:!!inv.paid, label: inv.paid ? `Bezahlt` : `Noch nicht bezahlt (fällig ${fmtHumanLong(inv.dueDate)})`, date: inv.paid?inv.paidDate:null });
+    openSimpleModal(`
+      <h3 style="margin:0 0 6px;">🔍 Verlauf — ${inv.id}</h3>
+      <p class="admin-meta">${custName} · ${chf(brutto)}</p>
+      <div style="margin-top:16px;display:flex;flex-direction:column;gap:0;">
+        ${steps.map((s,i)=>`
+          <div style="display:flex;gap:12px;">
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <div style="width:22px;height:22px;border-radius:50%;background:${s.done?'#198754':'rgba(var(--adm-fg-rgb),.15)'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 auto;">${s.done?'✓':'○'}</div>
+              ${i<steps.length-1?`<div style="width:2px;flex:1;background:rgba(var(--adm-fg-rgb),.15);min-height:20px;"></div>`:''}
             </div>
-            <button class="obj-mini admin-act-invoice" data-act="invoice-pdf">PDF ansehen</button>
-          </div>
-        </div>`;
+            <div style="padding-bottom:20px;">
+              <div style="font-weight:650;color:var(--adm-fg);font-size:13.5px;">${s.label}</div>
+              ${s.date?`<div class="folder-meta">${fmtHumanLong(s.date)}</div>`:''}
+            </div>
+          </div>`).join('')}
+      </div>`);
+  }
+
+  function computeMonthStats(year, month){
+    const inMonth = (d) => d && d.getFullYear()===year && d.getMonth()===month;
+    let onlineAnfragen=0, manuelleOfferten=0, montage=0, beplankung=0, silentpanels=0, ausflockung=0;
+    Object.values(orders).forEach(o=>{
+      if(inMonth(new Date(o.createdAt))) onlineAnfragen++;
+      Object.entries(o.groups).forEach(([gkey,g])=>{
+        if(!g.range || !g.range.length || g.status==='declined') return;
+        if(!inMonth(g.range[0])) return;
+        if(gkey==='montage') montage++;
+        if(gkey==='innen'){
+          const parts = (o.parts||[]).filter(p=>['beplankung','silentpanels'].includes(p.key));
+          if(parts.some(p=>p.key==='beplankung')) beplankung++;
+          if(parts.some(p=>p.key==='silentpanels')) silentpanels++;
+        }
+        if(gkey==='ausflockung') ausflockung++;
+      });
     });
-    html += `</div>`;
+    manualOffers.forEach(mo=>{ if(inMonth(new Date(mo.createdAt))) manuelleOfferten++; });
+    return {onlineAnfragen, manuelleOfferten, montage, beplankung, silentpanels, ausflockung};
+  }
+  function statDelta(cur, prev){
+    if(prev===0) return cur===0 ? null : {pct:100, up:true};
+    const pct = Math.round(((cur-prev)/prev)*100);
+    return {pct:Math.abs(pct), up:pct>=0};
+  }
+  const STAT_CATS = [
+    {key:'onlineAnfragen', label:'Online-Anfragen', color:'#0a7cff', icon:'📥'},
+    {key:'manuelleOfferten', label:'Manuelle Offerten', color:'#8b5cf6', icon:'📝'},
+    {key:'montage', label:'Montage-Termine', color:'#2563eb', icon:'🔧'},
+    {key:'beplankung', label:'Beplankung-Termine', color:'#059669', icon:'🏗'},
+    {key:'silentpanels', label:'SilentPanels-Termine', color:'#0891b2', icon:'🔇'},
+    {key:'ausflockung', label:'Ausflockung-Termine', color:'#b45309', icon:'❄️'},
+  ];
+  function adminArchivHtml(){
+    const y = statsMonthCursor.getFullYear(), m = statsMonthCursor.getMonth();
+    const cur = computeMonthStats(y, m);
+    const prevDate = new Date(y, m-1, 1);
+    const prev = computeMonthStats(prevDate.getFullYear(), prevDate.getMonth());
+    const monthLabel = statsMonthCursor.toLocaleDateString('de-CH',{month:'long', year:'numeric'});
+    const maxVal = Math.max(1, ...STAT_CATS.map(c=>cur[c.key]));
+
+    // Jahresübersicht (12 Monate, Summe aller Kategorien) für den Trend
+    const yearMonths = Array.from({length:12},(_,i)=> computeMonthStats(y, i));
+    const yearTotals = yearMonths.map(s=> STAT_CATS.reduce((a,c)=>a+s[c.key],0));
+    const maxYear = Math.max(1, ...yearTotals);
+
+    let html = `${pageHeaderHtml('📊','Statistik','Auswertung Anfragen, Offerten und Termine — pro Monat oder Jahr.')}
+      <div class="admin-card" style="margin-bottom:18px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button class="obj-mini" id="stats-prev-month">‹</button>
+            <span style="font-size:16px;font-weight:650;color:var(--adm-fg);text-transform:capitalize;min-width:160px;text-align:center;">${monthLabel}</span>
+            <button class="obj-mini" id="stats-next-month">›</button>
+            <button class="obj-mini" id="stats-today">Heute</button>
+          </div>
+          <button class="btn btn-primary btn-sm" id="stats-pdf-btn">📄 Als PDF exportieren</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px;">
+        ${STAT_CATS.map(c=>{
+          const delta = statDelta(cur[c.key], prev[c.key]);
+          return `<div class="admin-card" style="padding:16px;">
+            <div style="font-size:12px;color:rgba(var(--adm-fg-rgb),.55);font-weight:700;text-transform:uppercase;letter-spacing:.03em;">${c.icon} ${c.label}</div>
+            <div style="font-size:28px;font-weight:800;color:var(--adm-fg);margin:6px 0 4px;">${cur[c.key]}</div>
+            ${delta ? `<div style="font-size:12.5px;font-weight:700;color:${delta.up?'#16a34a':'#dc3545'};">${delta.up?'▲':'▼'} ${delta.pct}% ggü. Vormonat</div>` : `<div style="font-size:12.5px;color:rgba(var(--adm-fg-rgb),.4);">kein Vergleichswert</div>`}
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="admin-card" style="margin-bottom:18px;">
+        <div class="settings-section-label" style="margin-top:0;">Verteilung — ${monthLabel}</div>
+        <svg viewBox="0 0 600 220" style="width:100%;height:220px;">
+          ${STAT_CATS.map((c,i)=>{
+            const barW = 70, gap = (600-STAT_CATS.length*barW)/(STAT_CATS.length+1);
+            const x = gap + i*(barW+gap);
+            const h = (cur[c.key]/maxVal)*150;
+            const y0 = 175 - h;
+            return `<rect x="${x}" y="${y0}" width="${barW}" height="${h}" fill="${c.color}" rx="4"></rect>
+              <text x="${x+barW/2}" y="${y0-8}" text-anchor="middle" font-size="13" font-weight="700" fill="var(--adm-fg,#333)">${cur[c.key]}</text>
+              <text x="${x+barW/2}" y="200" text-anchor="middle" font-size="10" fill="#888">${c.label.split('-')[0]}</text>`;
+          }).join('')}
+        </svg>
+      </div>
+      <div class="admin-card">
+        <div class="settings-section-label" style="margin-top:0;">Jahresverlauf ${y} (alle Kategorien summiert)</div>
+        <svg viewBox="0 0 600 160" style="width:100%;height:160px;">
+          <polyline points="${yearTotals.map((v,i)=>`${20+i*52},${140-(v/maxYear)*110}`).join(' ')}" fill="none" stroke="#0a7cff" stroke-width="2.5"></polyline>
+          ${yearTotals.map((v,i)=>`<circle cx="${20+i*52}" cy="${140-(v/maxYear)*110}" r="${i===m?5:3}" fill="${i===m?'#0a7cff':'#94a3b8'}"></circle>`).join('')}
+          ${['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'].map((mn,i)=>`<text x="${20+i*52}" y="155" text-anchor="middle" font-size="9" fill="#888">${mn}</text>`).join('')}
+        </svg>
+      </div>`;
     return html;
   }
+  function buildStatsReportHtml(y, m, cur, prev, monthLabel){
+    return `
+      <div class="offer-doc">
+        <div class="offer-head">
+          <img src="${SETTINGS.logoDataUrl}" alt="${SETTINGS.name}">
+          <div class="company-addr"><strong>${SETTINGS.name}</strong><br>${SETTINGS.street}<br>${SETTINGS.city}</div>
+        </div>
+        <div class="offer-title-row">
+          <h1>Statistik-Report</h1>
+          <div class="offer-meta">${monthLabel}<br>Erstellt am ${fmtHumanLong(today)}</div>
+        </div>
+        <table class="offer-table"><thead><tr><th>Kategorie</th><th class="num">${monthLabel}</th><th class="num">Vormonat</th><th class="num">Veränderung</th></tr></thead>
+          <tbody>${STAT_CATS.map(c=>{
+            const delta = statDelta(cur[c.key], prev[c.key]);
+            return `<tr><td>${c.icon} ${c.label}</td><td class="num">${cur[c.key]}</td><td class="num">${prev[c.key]}</td><td class="num">${delta?(delta.up?'+':'−')+delta.pct+'%':'—'}</td></tr>`;
+          }).join('')}</tbody>
+        </table>
+        <div class="offer-footer">${SETTINGS.name} · ${SETTINGS.street} · ${SETTINGS.city}<br>Demo-Dokument einer Beispiel-Webseite — nicht rechtsverbindlich.</div>
+      </div>`;
+  }
+
 
   function getCustomerObjekte(email){
     const map = {};
@@ -4215,19 +4448,27 @@
   function openManualOfferActionsModal(id){
     const mo = manualOffers.find(m=>m.id===id);
     const statusLabel = {offen:'Offen', AB:'In AB umgewandelt', verloren:'Verloren'};
+    const wasUnseen = !!mo.blockedUnseen;
+    if(wasUnseen){ mo.blockedUnseen = false; fsSaveManualOffer(mo); updateTabBadges(); }
     const overlay = openSimpleModal(`
       <h3 style="margin:0 0 6px;">${mo.id} — ${mo.customerName}</h3>
       <p class="admin-meta">${chf(mo.total)} netto · Status: ${statusLabel[mo.status]}</p>
+      ${mo.blockedReason ? `<div class="admin-card" style="background:rgba(255,59,48,.1);border-color:rgba(255,59,48,.3);margin:10px 0;"><strong style="color:#ff6b62;">⚠ Blockiert gemeldet:</strong><br>${mo.blockedReason}</div>` : ''}
       <div class="admin-actions">
         <button class="btn btn-secondary btn-sm" id="mo-pdf-btn">Als PDF speichern</button>
         ${mo.status==='offen' ? `
           <button class="btn btn-primary btn-sm" id="mo-ab-btn">In AB umwandeln</button>
           <button class="btn btn-ghost btn-sm" id="mo-lost-btn" style="color:var(--adm-fg);border-color:rgba(var(--adm-fg-rgb),.3);">Als verloren markieren</button>
           <button class="btn btn-ghost btn-sm" id="mo-delete-btn" style="color:var(--adm-fg);border-color:rgba(var(--adm-fg-rgb),.3);">🗑️ Löschen</button>` : ''}
+        ${mo.status==='AB' ? `<button class="btn btn-primary btn-sm" id="mo-schedule-btn">📅 Termin im Froh-Kalender planen</button>` : ''}
       </div>`);
     overlay.querySelector('#mo-pdf-btn').addEventListener('click', ()=>{ $('#print-area').innerHTML = buildManualOfferHtml(mo); window.print(); });
     if(mo.status==='offen'){
-      overlay.querySelector('#mo-ab-btn').addEventListener('click', ()=>{ mo.status='AB'; fsSaveManualOffer(mo); overlay.remove(); renderAdminBody(); });
+      overlay.querySelector('#mo-ab-btn').addEventListener('click', ()=>{
+        mo.status='AB'; fsSaveManualOffer(mo); overlay.remove();
+        renderAdminBody();
+        openScheduleManualOfferModal(mo);
+      });
       overlay.querySelector('#mo-lost-btn').addEventListener('click', ()=>{ mo.status='verloren'; fsSaveManualOffer(mo); overlay.remove(); renderAdminBody(); });
       overlay.querySelector('#mo-delete-btn').addEventListener('click', ()=>{
         for(let i=manualOffers.length-1;i>=0;i--) if(manualOffers[i].id===id) manualOffers.splice(i,1);
@@ -4236,6 +4477,147 @@
         renderAdminBody();
       });
     }
+    if(mo.status==='AB' && overlay.querySelector('#mo-schedule-btn')){
+      overlay.querySelector('#mo-schedule-btn').addEventListener('click', ()=>{ overlay.remove(); openScheduleManualOfferModal(mo); });
+    }
+  }
+
+  function openScheduleManualOfferModal(mo){
+    const overlay = openSimpleModal(`
+      <h3 style="margin:0 0 6px;">📅 Termin planen — ${mo.customerName}</h3>
+      <p class="admin-meta">${mo.id} · wird nach dem Speichern automatisch im Froh-Kalender angelegt.</p>
+      <div class="admin-field" style="margin-top:12px;"><label>Team</label>
+        <select id="sched-team">
+          <option value="montage">Montage (GIS)</option>
+          <option value="beplankung">Beplankung / SilentPanels</option>
+          <option value="ausflocken">Ausflockung</option>
+        </select>
+      </div>
+      <div class="admin-grid2">
+        <div class="admin-field"><label>Start-Datum</label><input type="date" id="sched-start"></div>
+        <div class="admin-field"><label>End-Datum (optional, für mehrere Tage)</label><input type="date" id="sched-end"></div>
+      </div>
+      <div class="admin-actions"><button class="btn btn-primary btn-sm" id="sched-save-btn">Im Kalender eintragen</button></div>`);
+    overlay.querySelector('#sched-save-btn').addEventListener('click', ()=>{
+      const calType = overlay.querySelector('#sched-team').value;
+      const startStr = overlay.querySelector('#sched-start').value;
+      const endStr = overlay.querySelector('#sched-end').value;
+      if(!startStr) return;
+      syncManualOfferToFrohKalender(mo, calType, startStr, endStr||null).then(()=>{
+        overlay.remove();
+        alert(fsReady ? 'Termin wurde im Froh-Kalender angelegt.' : 'Termin gespeichert (nur für diese Sitzung — keine Firebase-Verbindung).');
+      }).catch(()=>{
+        alert('Speichern fehlgeschlagen. Bitte erneut versuchen.');
+      });
+    });
+  }
+
+  let mitarbeiterExpanded = null; // Name des aktuell aufgeklappten Monteurs
+  function hoursInRange(monteur, from, to){
+    return hoursLog.filter(h=> h.monteur===monteur && h.date>=from && h.date<to).reduce((a,h)=>a+h.hours,0);
+  }
+  function weeksBetween(from, to){
+    const weeks = [];
+    let cursor = mondayOf(from);
+    while(cursor < to){ weeks.push(new Date(cursor)); cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate()+7); }
+    return weeks;
+  }
+  function exportHoursCSV(monteur, from, to, label){
+    const rows = hoursLog.filter(h=> (!monteur||h.monteur===monteur) && h.date>=from && h.date<to).sort((a,b)=>a.date-b.date);
+    let csv = 'Datum;Monteur;Auftrag;Stunden\n';
+    rows.forEach(h=> csv += `${h.date.toLocaleDateString('de-CH')};${h.monteur};${h.orderId||h.customer||''};${h.hours}\n`);
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `Stunden_${(monteur||'alle').replace(/\s+/g,'_')}_${label}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+  function openFerienMainModal(){
+    const overlay = openSimpleModal(`
+      <h3 style="margin:0 0 12px;">🌴 Ferien/Krankheit eintragen</h3>
+      <div class="admin-field"><label>Monteur</label>
+        <select id="fm-monteur">${monteure.map(m=>`<option value="${m.name}">${m.name}</option>`).join('')}</select>
+      </div>
+      <div class="admin-grid2">
+        <div class="admin-field"><label>Von</label><input type="date" id="fm-von"></div>
+        <div class="admin-field"><label>Bis</label><input type="date" id="fm-bis"></div>
+      </div>
+      <div class="admin-field"><label>Art</label>
+        <select id="fm-art"><option value="ferien">🌴 Ferien</option><option value="krankheit">🤒 Krankheit</option></select>
+      </div>
+      <div class="admin-actions"><button class="btn btn-primary btn-sm" id="fm-save-btn">Speichern</button></div>`);
+    overlay.querySelector('#fm-save-btn').addEventListener('click', ()=>{
+      const von = overlay.querySelector('#fm-von').value, bis = overlay.querySelector('#fm-bis').value;
+      if(!von || !bis) return;
+      const f = { id:'fm-'+Date.now(), monteur:overlay.querySelector('#fm-monteur').value, von, bis, art:overlay.querySelector('#fm-art').value };
+      ferienMain.push(f);
+      fsSaveFerienMain(f);
+      overlay.remove();
+      renderAdminBody();
+    });
+  }
+
+  function adminMitarbeiterHtml(){
+    let html = `${pageHeaderHtml('👷','Mitarbeiter','Stunden freigeben/anpassen, Überstunden, Ferien und Krankheit.')}`;
+    if(!monteure.length){ html += `<div class="admin-empty">Noch keine Monteure erfasst — unter Einstellungen → Team &amp; Monteure hinzufügen.</div>`; return html; }
+
+    const weekStart = mondayOf(today);
+    const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate()+7);
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const monthEnd = new Date(today.getFullYear(), today.getMonth()+1, 1);
+    const yearStart = new Date(today.getFullYear(), 0, 1);
+    const yearEnd = new Date(today.getFullYear()+1, 0, 1);
+    const SOLL_WOCHE = 42;
+
+    html += `<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+      <button class="btn btn-secondary btn-sm" id="mit-export-woche">📤 Export Woche (alle)</button>
+      <button class="btn btn-secondary btn-sm" id="mit-export-monat">📤 Export Monat (alle)</button>
+      <button class="btn btn-secondary btn-sm" id="mit-export-jahr">📤 Export Jahr (alle)</button>
+      <button class="btn btn-primary btn-sm" id="mit-ferien-btn">🌴 Ferien/Krankheit eintragen</button>
+    </div>`;
+
+    html += `<div class="folder-list">`;
+    monteure.forEach(m=>{
+      const wH = hoursInRange(m.name, weekStart, weekEnd);
+      const mH = hoursInRange(m.name, monthStart, monthEnd);
+      const yH = hoursInRange(m.name, yearStart, yearEnd);
+      const overtime = wH - SOLL_WOCHE;
+      const expanded = mitarbeiterExpanded===m.name;
+      const myFerien = ferienMain.filter(f=>f.monteur===m.name).sort((a,b)=> new Date(b.von)-new Date(a.von));
+      html += `
+        <div class="admin-card" data-monteur="${m.name}" style="padding:14px 18px;">
+          <div class="admin-row" style="align-items:center;cursor:pointer;" data-act="toggle-mitarbeiter">
+            <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">
+              <span style="font-size:14px;font-weight:650;color:var(--adm-fg);">👷 ${m.name}</span>
+              <span class="folder-meta">Woche: ${wH.toFixed(1)}h</span>
+              <span class="folder-meta">Monat: ${mH.toFixed(1)}h</span>
+              <span class="folder-meta">Jahr: ${yH.toFixed(1)}h</span>
+              ${overtime>0 ? `<span class="admin-badge overdue">+${overtime.toFixed(1)}h Überstunden</span>` : ''}
+            </div>
+            <span style="font-size:13px;color:rgba(var(--adm-fg-rgb),.5);">${expanded?'▲':'▼'}</span>
+          </div>
+          ${expanded ? `
+            <div style="margin-top:14px;">
+              <div class="settings-section-label" style="margin-top:0;">Einzelne Einträge (diesen Monat)</div>
+              <table class="admin-table"><thead><tr><th>Datum</th><th>Auftrag/Kunde</th><th>Stunden</th><th></th></tr></thead>
+                <tbody>${hoursLog.filter(h=>h.monteur===m.name && h.date>=monthStart && h.date<monthEnd).sort((a,b)=>b.date-a.date).map((h)=>{
+                  const idx = hoursLog.indexOf(h);
+                  return `<tr><td>${h.date.toLocaleDateString('de-CH')}</td><td>${h.orderId||h.customer||'—'}${h.source==='kalender'?' <span class="folder-meta">(Froh-Kalender)</span>':''}</td><td><input type="number" step="0.25" class="mit-hours-input" data-idx="${idx}" value="${h.hours}" style="width:70px;"></td><td><button class="obj-mini mit-hours-save" data-idx="${idx}">✓</button></td></tr>`;
+                }).join('') || '<tr><td colspan="4" class="folder-meta">Keine Einträge diesen Monat.</td></tr>'}</tbody>
+              </table>
+              <div class="settings-section-label">Ferien &amp; Krankheit</div>
+              ${myFerien.length ? `<table class="admin-table"><thead><tr><th>Von</th><th>Bis</th><th>Art</th><th></th></tr></thead>
+                <tbody>${myFerien.map(f=>`<tr><td>${fmtHumanLong(pdate(f.von))}</td><td>${fmtHumanLong(pdate(f.bis))}</td><td>${f.art==='krankheit'?'🤒 Krankheit':'🌴 Ferien'}</td><td><button class="obj-mini mit-ferien-del" data-id="${f.id}">🗑️</button></td></tr>`).join('')}</tbody>
+              </table>` : `<div class="folder-meta">Keine Einträge erfasst.</div>`}
+              <div style="margin-top:10px;">
+                <button class="obj-mini mit-export-person" data-monteur="${m.name}">📤 Export dieser Person (Monat)</button>
+              </div>
+            </div>` : ''}
+        </div>`;
+    });
+    html += `</div>`;
+    return html;
   }
 
   function adminDashboardHtml(){
@@ -4454,10 +4836,14 @@
         });
       });
       Promise.all(promises).then(()=>{
-        fsSaveSettings();
         renderOverviewGrid();
         renderAdminBody();
-        alert(fsReady ? 'Homepage-Kacheln gespeichert und live synchronisiert.' : 'Homepage-Kacheln gespeichert (nur für diese Sitzung/Vorführung — keine Firebase-Verbindung).');
+        if(!fsReady){ alert('Homepage-Kacheln gespeichert (nur für diese Sitzung/Vorführung — keine Firebase-Verbindung).'); return; }
+        fsSaveShowcase().then(()=>{
+          alert('Homepage-Kacheln gespeichert und live synchronisiert.');
+        }).catch(()=>{
+          alert('Achtung: Speichern fehlgeschlagen (z. B. Bild zu gross). Bitte ein kleineres Bild wählen und erneut versuchen.');
+        });
       });
     });
     const saveBtn = $('#save-settings-btn');
@@ -4763,10 +5149,57 @@
     });
   }
 
+  function groupElementQty(gkey, order){
+    if(!order) return 0;
+    const groupDef = GROUPS.find(g=>g.key===gkey);
+    if(!groupDef) return 0;
+    const parts = order.parts.filter(p=>groupDef.services.includes(p.key));
+    let qty = 0;
+    parts.forEach(p=> p.lines.forEach(l=>{
+      const m = l.label.match(/×\s*([\d.]+)/);
+      if(m) qty += parseFloat(m[1]);
+    }));
+    return qty;
+  }
+  const CAL_TYPE_MAP = { montage:'montage', innen:'beplankung', ausflockung:'ausflocken' };
+  function syncOrderGroupToFrohKalender(order, gkey){
+    if(!fsReady) return;
+    const g = order.groups[gkey];
+    if(!g || g.status!=='confirmed' || !g.range || !g.range.length) return;
+    const calType = CAL_TYPE_MAP[gkey] || 'montage';
+    const sorted = g.range.slice().sort((a,b)=>a-b);
+    const startStr = dateKey(sorted[0]);
+    const endStr = sorted.length>1 ? dateKey(sorted[sorted.length-1]) : null;
+    const docId = `sync-${order.id}-${gkey}`;
+    db.collection('teams_cal_froh-tech').doc(docId).set({
+      id: docId, createdAt: new Date().toISOString(), isDone:false, isBilled:false,
+      entryType:'LIEFERUNG', customer:order.customer.name, address:order.customer.address,
+      memo:'', auftragsNr:order.id, target: groupElementQty(gkey, order),
+      images:[], image:null, deliveryDate:startStr, endDate:endStr, isMultiDay:!!endStr,
+      calType, isProv:false, customStartLabel:'', fehlerIntern:false, weiterVerrechnen:false,
+      assignedMonteure:[], installedQty:0, zusatzQty:0, progressLog:[],
+    }, {merge:true}).catch(e=>console.warn('syncOrderGroupToFrohKalender', e));
+  }
+  function syncManualOfferToFrohKalender(mo, calType, startStr, endStr){
+    if(!fsReady) return Promise.resolve();
+    const docId = `sync-mo-${mo.id}`;
+    let target = 0;
+    (mo.items||[]).forEach(it=>{ const m = (it.label||'').match(/×\s*([\d.]+)/); if(m) target += parseFloat(m[1]); });
+    return db.collection('teams_cal_froh-tech').doc(docId).set({
+      id: docId, createdAt: new Date().toISOString(), isDone:false, isBilled:false,
+      entryType:'LIEFERUNG', customer:mo.customerName, address:mo.customerAddress||'',
+      memo:mo.notes||'', auftragsNr:mo.id, target,
+      images:[], image:null, deliveryDate:startStr, endDate:endStr||null, isMultiDay:!!endStr,
+      calType, isProv:false, customStartLabel:'', fehlerIntern:false, weiterVerrechnen:false,
+      assignedMonteure:[], installedQty:0, zusatzQty:0, progressLog:[],
+    }, {merge:true}).catch(e=>{ console.warn('syncManualOfferToFrohKalender', e); throw e; });
+  }
+
   function adminConfirmGroup(orderId, gkey){
     const o = orders[orderId], g = o.groups[gkey];
     g.status = 'confirmed';
     fsSaveOrder(o);
+    syncOrderGroupToFrohKalender(o, gkey);
     renderAdminBody();
     showAdminEmailPreview(o, g, 'confirmed', gkey);
   }
@@ -4938,6 +5371,12 @@
       const subject = `Zahlungserinnerung ${inv.id} — ${SETTINGS.name}`;
       const body = `Guten Tag ${custName}\n\nGemäss unseren Unterlagen ist die Rechnung ${inv.id} vom ${fmtHumanLong(inv.sentDate)} über ${chf(brutto)} noch offen (fällig seit ${fmtHumanLong(inv.dueDate)}).\n\nWir bitten Sie um Ausgleich innert 10 Tagen.\n\nFreundliche Grüsse\n${SETTINGS.name}`;
       window.location.href = `mailto:${custEmail}?cc=${SETTINGS.requestEmail}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      inv.mahnungSent = true;
+      inv.mahnungCount = (inv.mahnungCount||0)+1;
+      inv.mahnungDate = new Date();
+      fsSaveInvoice(inv);
+      overlay.remove();
+      renderAdminBody();
     });
   }
 
@@ -5080,12 +5519,75 @@
     openFrohKalenderOverlay();
   }
 
+  function openZusatzMehrpreisModal(orderId, gkey){
+    const o = orders[orderId], g = o.groups[gkey];
+    if(g.zusatzUnseen){ g.zusatzUnseen = false; g.zusatzHandled = true; fsSaveOrder(o); updateTabBadges(); }
+    const defaultPrice = gkey==='montage' ? PRICES.vorwandStd : gkey==='innen' ? PRICES.beplankung.gkpi18.price : PRICES.ausflockungProM3;
+    const qty = g.zusatzQty||0;
+    const overlay = openSimpleModal(`
+      <h3 style="margin:0 0 6px;">➕ Mehrpreis — ${g.label}</h3>
+      <p class="admin-meta">${o.customer.name} · ${o.customer.address}</p>
+      <p class="admin-settings-hint" style="margin-top:6px;">Ein Monteur hat ${qty} zusätzliche Einheiten gemeldet, die nicht im ursprünglichen Auftrag enthalten waren.</p>
+      <div class="admin-grid2" style="margin-top:10px;">
+        <div class="admin-field"><label>Zusätzliche Menge</label><input type="number" id="zm-qty" value="${qty}"></div>
+        <div class="admin-field"><label>Preis pro Einheit (CHF)</label><input type="number" id="zm-price" value="${defaultPrice}"></div>
+      </div>
+      <div style="font-size:16px;font-weight:650;color:var(--adm-fg);margin:6px 0 14px;">Total Mehrpreis (netto): <span id="zm-total">${chf(qty*defaultPrice)}</span></div>
+      <div class="admin-actions">
+        <button class="btn btn-primary btn-sm" id="zm-pdf-btn">Als PDF speichern</button>
+        <button class="btn btn-secondary btn-sm" id="zm-mail-btn">PDF öffnen + E-Mail vorbereiten</button>
+      </div>
+      <p class="admin-settings-hint" style="margin-top:10px;">Im Druckdialog "Als PDF speichern" wählen, dann im Mail-Fenster die Datei manuell anhängen.</p>`);
+    const recalc = ()=>{
+      const q = parseFloat(overlay.querySelector('#zm-qty').value)||0;
+      const p = parseFloat(overlay.querySelector('#zm-price').value)||0;
+      overlay.querySelector('#zm-total').textContent = chf(q*p);
+    };
+    overlay.querySelector('#zm-qty').addEventListener('input', recalc);
+    overlay.querySelector('#zm-price').addEventListener('input', recalc);
+    const buildDoc = ()=>{
+      const q = parseFloat(overlay.querySelector('#zm-qty').value)||0;
+      const p = parseFloat(overlay.querySelector('#zm-price').value)||0;
+      const total = q*p;
+      const mwst = Math.round(total*MWST_RATE*100)/100;
+      return `
+        <div class="offer-doc">
+          <div class="offer-head">
+            <img src="${SETTINGS.logoDataUrl}" alt="${SETTINGS.name}">
+            <div class="company-addr"><strong>${SETTINGS.name}</strong><br>${SETTINGS.street}<br>${SETTINGS.city}<br>Tel. ${SETTINGS.phone}<br>${SETTINGS.email}</div>
+          </div>
+          <div class="offer-title-row">
+            <h1>Mehrpreis-Vorschlag</h1>
+            <div class="offer-meta">Auftrag ${o.id}<br>${g.label}<br>Datum: ${fmtHumanLong(today)}</div>
+          </div>
+          <div class="offer-parties"><div><div class="label">Kunde</div>${o.customer.name}<br>${o.customer.address}</div></div>
+          <table class="offer-table"><thead><tr><th>Position</th><th class="num">Betrag</th></tr></thead>
+            <tbody><tr><td>Zusätzlich montierte Einheiten (${q} × ${chf(p)})</td><td class="num">${chf(total)}</td></tr></tbody>
+          </table>
+          <div class="offer-totals">
+            <div class="t-line"><span>Zwischensumme (netto)</span><span>${chf(total)}</span></div>
+            <div class="t-line"><span>MWST ${(MWST_RATE*100).toFixed(1)}%</span><span>${chf(mwst)}</span></div>
+            <div class="t-grand"><span>Total inkl. MWST</span><span>${chf(Math.round((total+mwst)*100)/100)}</span></div>
+          </div>
+          <div class="offer-footer">${SETTINGS.name} · ${SETTINGS.street} · ${SETTINGS.city}<br>Demo-Dokument einer Beispiel-Webseite — nicht rechtsverbindlich.</div>
+        </div>`;
+    };
+    overlay.querySelector('#zm-pdf-btn').addEventListener('click', ()=>{ $('#print-area').innerHTML = buildDoc(); window.print(); });
+    overlay.querySelector('#zm-mail-btn').addEventListener('click', ()=>{
+      $('#print-area').innerHTML = buildDoc();
+      window.print();
+      const subject = `Mehrpreis-Vorschlag — ${g.label}`;
+      window.location.href = `mailto:${o.customer.email}?cc=${SETTINGS.requestEmail}&subject=${encodeURIComponent(subject)}`;
+    });
+  }
+
   function openBlockedInfoModal(orderId, gkey){
     const o = orders[orderId], g = o.groups[gkey];
     const b = g.blocked || {};
+    if(b.unseen){ b.unseen = false; fsSaveOrder(o); updateTabBadges(); }
     const overlay = openSimpleModal(`
       <h3 style="margin:0 0 6px;">⚠ Blockiert-Info — ${g.label}</h3>
-      <p class="admin-meta">${o.customer.name} · ${o.customer.email}</p>
+      <p class="admin-meta">${o.customer.name} · ${o.customer.email}${b.reportedBy?` · gemeldet von ${b.reportedBy}`:''}</p>
       <div class="admin-card" style="white-space:pre-wrap;font-size:13.5px;margin:10px 0;">${b.text||'(kein Text hinterlegt)'}</div>
       ${b.photo?`<img src="${b.photo}" style="max-width:100%;border-radius:10px;margin-bottom:10px;">`:''}
       <div class="admin-actions">
@@ -5173,6 +5675,59 @@
     $all('[data-subtab]').forEach(btn=>{
       btn.addEventListener('click', ()=>{ auftraegeSubTab = btn.dataset.subtab; renderAdminBody(); });
     });
+    $all('[data-rsubtab]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ rechnungenSubTab = btn.dataset.rsubtab; renderAdminBody(); });
+    });
+    if($('#stats-prev-month')) $('#stats-prev-month').addEventListener('click', ()=>{ statsMonthCursor = new Date(statsMonthCursor.getFullYear(), statsMonthCursor.getMonth()-1, 1); renderAdminBody(); });
+    if($('#stats-next-month')) $('#stats-next-month').addEventListener('click', ()=>{ statsMonthCursor = new Date(statsMonthCursor.getFullYear(), statsMonthCursor.getMonth()+1, 1); renderAdminBody(); });
+    if($('#stats-today')) $('#stats-today').addEventListener('click', ()=>{ statsMonthCursor = new Date(today.getFullYear(), today.getMonth(), 1); renderAdminBody(); });
+    if($('#stats-pdf-btn')) $('#stats-pdf-btn').addEventListener('click', ()=>{
+      const y = statsMonthCursor.getFullYear(), m = statsMonthCursor.getMonth();
+      const cur = computeMonthStats(y, m);
+      const prevDate = new Date(y, m-1, 1);
+      const prev = computeMonthStats(prevDate.getFullYear(), prevDate.getMonth());
+      const monthLabel = statsMonthCursor.toLocaleDateString('de-CH',{month:'long', year:'numeric'});
+      $('#print-area').innerHTML = buildStatsReportHtml(y, m, cur, prev, monthLabel);
+      window.print();
+    });
+    $all('[data-act="toggle-mitarbeiter"]').forEach(row=>{
+      row.addEventListener('click', ()=>{
+        const name = row.closest('[data-monteur]').dataset.monteur;
+        mitarbeiterExpanded = mitarbeiterExpanded===name ? null : name;
+        renderAdminBody();
+      });
+    });
+    $all('.mit-hours-save').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const idx = parseInt(btn.dataset.idx);
+        const input = $(`.mit-hours-input[data-idx="${idx}"]`);
+        fsAdjustHoursEntry(idx, parseFloat(input.value)||0);
+        alert('Stunden angepasst.');
+      });
+    });
+    $all('.mit-ferien-del').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        if(confirm('Eintrag löschen?')){ fsDeleteFerienMain(btn.dataset.id); renderAdminBody(); }
+      });
+    });
+    $all('.mit-export-person').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        const monthEnd = new Date(today.getFullYear(), today.getMonth()+1, 1);
+        exportHoursCSV(btn.dataset.monteur, monthStart, monthEnd, 'Monat');
+      });
+    });
+    if($('#mit-export-woche')) $('#mit-export-woche').addEventListener('click', ()=>{
+      const ws = mondayOf(today); const we = new Date(ws.getFullYear(),ws.getMonth(),ws.getDate()+7);
+      exportHoursCSV(null, ws, we, 'Woche');
+    });
+    if($('#mit-export-monat')) $('#mit-export-monat').addEventListener('click', ()=>{
+      exportHoursCSV(null, new Date(today.getFullYear(),today.getMonth(),1), new Date(today.getFullYear(),today.getMonth()+1,1), 'Monat');
+    });
+    if($('#mit-export-jahr')) $('#mit-export-jahr').addEventListener('click', ()=>{
+      exportHoursCSV(null, new Date(today.getFullYear(),0,1), new Date(today.getFullYear()+1,0,1), 'Jahr');
+    });
+    if($('#mit-ferien-btn')) $('#mit-ferien-btn').addEventListener('click', openFerienMainModal);
     $all('.admin-act').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const card = btn.closest('[data-order]');
@@ -5183,6 +5738,7 @@
         else if(act==='blocked') openBlockedModal(orderId, gkey);
         else if(act==='blocked-info') openBlockedInfoModal(orderId, gkey);
         else if(act==='release') releaseBlockedOrder(orderId, gkey);
+        else if(act==='zusatz') openZusatzMehrpreisModal(orderId, gkey);
         else if(act==='assign-monteur') openAssignMonteurModal(orderId, gkey);
         else if(act==='akonto') openAkontoModal(orderId, gkey);
       });
@@ -5194,6 +5750,7 @@
         if(act==='mahnung') sendMahnung(invId);
         else if(act==='paid') markInvoicePaid(invId);
         else if(act==='invoice-pdf') openInvoiceModal(invId);
+        else if(act==='verlauf') openRechnungVerlaufModal(invId);
       });
     });
     ['auftraege','kunden','dashboard','rechnungen'].forEach(tabKey=>{
