@@ -1458,6 +1458,13 @@
             if(!g.zusatzHandled) g.zusatzUnseen = true;
             changed = true;
           }
+          if((d.target||0) > 0 && g.installedQty !== (d.installedQty||0)){
+            const reachedNow = (d.installedQty||0) >= d.target && (g.installedQty||0) < d.target;
+            g.installedQty = d.installedQty||0;
+            g.targetQty = d.target;
+            if(reachedNow) g.zielErreichtUnseen = true;
+            changed = true;
+          }
           if(changed) fsSaveOrder(order);
         } else if(!order && d.isBlocked){
           const mo = manualOffers.find(m=>m.id===d.auftragsNr);
@@ -3035,6 +3042,7 @@
     Object.values(orders).forEach(o=> Object.values(o.groups).forEach(g=>{
       if(g.status==='blocked' && g.blocked && g.blocked.unseen) count++;
       if(g.zusatzUnseen) count++;
+      if(g.zielErreichtUnseen) count++;
     }));
     manualOffers.forEach(mo=>{ if(mo.blockedUnseen) count++; });
     return count;
@@ -3621,7 +3629,8 @@
       const groupLines = Object.entries(o.groups).map(([gkey,g])=>{
         const canPdf = g.status==='confirmed' || g.status==='done';
         const canBlockedInfo = g.status==='blocked';
-        return `${g.label}: <span class="admin-badge ${g.status}">${objStatusLabel[g.status]||g.status}</span>${canPdf ? ` <button class="obj-mini order-pdf-btn" data-order="${o.id}" data-group="${gkey}">AB/PDF</button>` : ''}${canBlockedInfo ? ` <button class="obj-mini blocked-info-btn" data-order="${o.id}" data-group="${gkey}">📄 Info/PDF</button>` : ''}`;
+        const progress = g.targetQty>0 ? ` <span class="folder-meta">📊 ${g.installedQty||0}/${g.targetQty} Elemente montiert</span>${g.zielErreichtUnseen?` <span class="admin-badge overdue">🎯 Ziel erreicht — Akonto/Schlussrechnung prüfen</span>`:''}` : '';
+        return `${g.label}: <span class="admin-badge ${g.status}">${objStatusLabel[g.status]||g.status}</span>${canPdf ? ` <button class="obj-mini order-pdf-btn" data-order="${o.id}" data-group="${gkey}">AB/PDF</button>` : ''}${canBlockedInfo ? ` <button class="obj-mini blocked-info-btn" data-order="${o.id}" data-group="${gkey}">📄 Info/PDF</button>` : ''}${progress}`;
       }).join(' · ');
       return `<div class="obj-list-item"><span>${o.id} — ${chf(o.totals.netto)} netto</span><span>${groupLines} <button class="obj-mini move-order-btn" data-order="${o.id}">↔ Verschieben</button></span></div>`;
     }).join('') : '<div class="obj-empty">Keine Online-Anfragen für dieses Objekt.</div>';
@@ -5413,6 +5422,7 @@
 
   function openAkontoModal(orderId, gkey){
     const o = orders[orderId], g = o.groups[gkey];
+    if(g.zielErreichtUnseen){ g.zielErreichtUnseen = false; fsSaveOrder(o); updateTabBadges(); }
     const total = groupEffectiveAmount(o.parts, gkey, g);
     const invoiced = groupInvoicedAmount(orderId, gkey);
     const remaining = Math.round((total-invoiced)*100)/100;
