@@ -3013,8 +3013,8 @@
   const ADMIN_PASSWORD = 'froh2026'; // Notfall-Zugang, falls Firebase Authentication (noch) nicht eingerichtet ist
   // ── Persönliche Admin-Zugänge (Firebase Authentication) ──
   const SEED_ADMINS = [
-    {email:'a.s@froh-tech.ch', name:'Ajdin.s'},
-    {email:'a.dc@froh-tech.ch', name:'Alessandro. D'},
+    {email:'as@froh-tech.ch', name:'Ajdin.s'},
+    {email:'adc@froh-tech.ch', name:'Alessandro. D'},
     {email:'uf@froh-tech.ch', name:'Urim F.'},
     {email:'rf@froh-tech.ch', name:'Roland F.'},
     {email:'cs@froh-tech.ch', name:'Claudio S.'},
@@ -3027,8 +3027,9 @@
     if(!fsReady) return;
     db.collection('adminUsers').doc(u.email).set(u).catch(e=>console.warn('fsSaveAdminUser', e));
   }
-  async function ensureSeedAdmins(){
-    if(seedAdminsDone || !fsReady || !window.firebase || !firebase.auth) return;
+  async function ensureSeedAdmins(onProgress){
+    const log = (msg)=>{ console.log('[Konten-Einrichtung]', msg); if(onProgress) onProgress(msg); };
+    if(!fsReady || !window.firebase || !firebase.auth){ log('Keine Firebase-Verbindung — abgebrochen.'); return; }
     seedAdminsDone = true;
     for(const seed of SEED_ADMINS){
       const email = seed.email.toLowerCase();
@@ -3036,21 +3037,30 @@
         // Existiert das Konto in Firebase Authentication noch nicht, wird es hier mit dem
         // Startpasswort 1234 angelegt. Existiert es schon, schlägt das erwartungsgemäss fehl
         // und wir tun nichts weiter (kein Passwort-Reset, keine Überschreibung).
-        const cred = await firebase.auth().createUserWithEmailAndPassword(email, SEED_PASSWORD);
-        await firebase.auth().signOut(); // nicht als dieses Konto eingeloggt bleiben
-        if(!adminUsers[email]){
-          const u = { email, name:seed.name, role:'admin', mustChangePassword:true, createdAt:new Date().toISOString(), approvedBy:'system' };
-          adminUsers[email] = u;
-          fsSaveAdminUser(u);
+        await firebase.auth().createUserWithEmailAndPassword(email, SEED_PASSWORD);
+        log(`${email}: Konto neu angelegt (Startpasswort 1234).`);
+        // Firestore-Eintrag erfolgt, WÄHREND wir noch als dieses neue Konto angemeldet sind —
+        // das erfüllt übliche Sicherheitsregeln ("nur angemeldete Benutzer dürfen schreiben")
+        // zuverlässiger, als es danach abgemeldet zu versuchen.
+        const u = { email, name:seed.name, role:'admin', mustChangePassword:true, createdAt:new Date().toISOString(), approvedBy:'system' };
+        adminUsers[email] = u;
+        try{
+          await db.collection('adminUsers').doc(email).set(u);
+          log(`${email}: Freigabe-Eintrag in Firestore gespeichert. ✓`);
+        }catch(fsErr){
+          log(`${email}: FEHLER beim Speichern in Firestore — ${fsErr.code||fsErr.message}. Vermutlich blockieren die Firestore-Sicherheitsregeln das Schreiben in "adminUsers".`);
         }
+        await firebase.auth().signOut();
       }catch(e){
-        // 'auth/email-already-in-use' ist der Normalfall bei jedem weiteren Seitenaufruf.
-        if(e.code!=='auth/email-already-in-use') console.warn('ensureSeedAdmins', seed.email, e);
-        // Firestore-Eintrag trotzdem sicherstellen, falls er (z. B. nach einem Reset) fehlt.
-        if(!adminUsers[email]){
-          const u = { email, name:seed.name, role:'admin', mustChangePassword:true, createdAt:new Date().toISOString(), approvedBy:'system' };
-          adminUsers[email] = u;
-          fsSaveAdminUser(u);
+        if(e.code==='auth/email-already-in-use'){
+          log(`${email}: Konto existiert in Firebase Authentication bereits — wird nicht verändert.`);
+          if(!adminUsers[email]){
+            const u = { email, name:seed.name, role:'admin', mustChangePassword:true, createdAt:new Date().toISOString(), approvedBy:'system' };
+            adminUsers[email] = u;
+            fsSaveAdminUser(u);
+          }
+        } else {
+          log(`${email}: FEHLER — ${e.code||e.message}.`);
         }
       }
     }
@@ -3724,10 +3734,23 @@
           <p style="margin-top:16px;font-size:12.5px;text-align:center;">
             <a href="#" id="admin-register-link" style="color:var(--accent);">Noch kein Zugang? Registrieren</a>
           </p>
+          <div style="margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);">
+            <button class="btn btn-ghost btn-sm" id="admin-setup-btn" style="color:var(--adm-fg);border-color:rgba(var(--adm-fg-rgb),.3);font-size:11.5px;">🔧 Die fünf Admin-Konten einrichten/prüfen</button>
+            <div id="admin-setup-log" style="margin-top:8px;font-size:11px;font-family:monospace;color:rgba(255,255,255,.55);max-height:160px;overflow-y:auto;"></div>
+          </div>
         </div>
       </div>`;
     $('#admin-cancel-btn').addEventListener('click', ()=> root.innerHTML='');
     $('#admin-login-btn').addEventListener('click', tryAdminLogin);
+    $('#admin-setup-btn').addEventListener('click', async ()=>{
+      const logBox = $('#admin-setup-log');
+      logBox.innerHTML = '';
+      if(!fsReady){ logBox.innerHTML = 'Keine Firebase-Verbindung — bitte Seite mit echter Firebase-Konfiguration öffnen.'; return; }
+      $('#admin-setup-btn').disabled = true;
+      await ensureSeedAdmins((msg)=>{ logBox.innerHTML += msg.replace(/</g,'&lt;') + '<br>'; logBox.scrollTop = logBox.scrollHeight; });
+      $('#admin-setup-btn').disabled = false;
+      logBox.innerHTML += '<br><strong>Fertig.</strong> Jetzt oben mit E-Mail + Passwort 1234 versuchen.';
+    });
     $('#admin-pw').addEventListener('keydown', e=>{ if(e.key==='Enter') tryAdminLogin(); });
     $('#admin-register-link').addEventListener('click', (e)=>{ e.preventDefault(); openAdminRegister(); });
     applyAdminTheme();
@@ -3764,6 +3787,7 @@
       if(e.code==='auth/wrong-password' || e.code==='auth/invalid-credential' || e.code==='auth/invalid-login-credentials'){ errEl.textContent = 'Falsche E-Mail oder falsches Passwort.'; }
       else if(e.code==='auth/user-not-found'){ errEl.textContent = 'Diese E-Mail ist nicht registriert.'; }
       else if(e.code==='auth/too-many-requests'){ errEl.textContent = 'Zu viele Versuche — bitte kurz warten.'; }
+      else if(e.code==='auth/configuration-not-found'){ errEl.textContent = 'E-Mail/Passwort-Anmeldung ist in Firebase noch nicht aktiviert (Authentication → Sign-in method → Email/Password einschalten).'; }
       else { errEl.textContent = 'Anmeldung fehlgeschlagen: '+(e.message||e.code||e); }
       errEl.style.display = 'block';
     }
@@ -3805,6 +3829,7 @@
         $('#reg-ok').style.display='block';
       }catch(e){
         if(e.code==='auth/email-already-in-use') errEl.textContent = 'Diese E-Mail ist bereits registriert — bitte stattdessen anmelden.';
+        else if(e.code==='auth/configuration-not-found') errEl.textContent = 'E-Mail/Passwort-Anmeldung ist in Firebase noch nicht aktiviert (Authentication → Sign-in method → Email/Password einschalten).';
         else errEl.textContent = 'Registrierung fehlgeschlagen: '+(e.message||e.code||e);
         errEl.style.display = 'block';
       }
