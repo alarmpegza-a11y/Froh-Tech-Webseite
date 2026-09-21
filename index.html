@@ -1091,6 +1091,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script>
 (function(){
 
@@ -1358,6 +1359,8 @@
   const monteure = [];      // {name, phone, role, photo, email} — managed under Einstellungen
   const partners = [];      // {name, role, photo, email} — managed under Einstellungen, shown on the public Team page
   const ferien = [];       // {id, monteurName, start, end} — Ferien-Übersicht im Kalender
+  const vehicles = {};     // id -> {id, kennzeichen, marke, modell, policenNr, fahrzeugscheinNr, monteur, notes, docs:[{id,filename,mimeType,size,chunks}]}
+  const PDF_CHUNK_SIZE = 700000; // Zeichen pro Chunk (Base64) — bleibt sicher unter dem 1 MB-Limit pro Firestore-Dokument
   const contactMessages = []; // {id, name, email, message, date} — vom öffentlichen Kontaktformular
   const messages = []; // {id, fromName, fromEmail, toEmail, toName, text, refType, refLabel, refData, createdAt, unseen} — interne Nachrichten zwischen Team-Mitgliedern
   const sitzungen = {}; // keyed by ISO-Wochenschlüssel ('2026-W38'): {id, weekKey, weekLabel, items:[...], createdAt, lastEditedAt}
@@ -1530,6 +1533,73 @@
     ferienMain.forEach((f,i)=>{ if(f.id===id) ferienMain.splice(i,1); });
     if(!fsReady) return;
     db.collection('ferienMain').doc(id).delete().catch(e=>console.warn('fsDeleteFerienMain', e));
+  }
+  // ============================================================
+  // FAHRZEUGE — Verwaltung, inkl. PDF-Ablage in Teilen (Chunks), damit auch
+  // grössere Unterlagen (Fahrzeugausweis, Police, Servicehefte) problemlos
+  // hoch- und wieder heruntergeladen werden können, ohne an das 1-MB-Limit
+  // pro Firestore-Dokument zu stossen.
+  // ============================================================
+  function fsSaveVehicle(v){
+    if(!fsReady) return;
+    const { docs, ...meta } = v; // Dokument-Chunks liegen in einer eigenen Sammlung, nicht im Fahrzeug-Dokument selbst
+    const docsMeta = (docs||[]).map(d=>({id:d.id, filename:d.filename, mimeType:d.mimeType, size:d.size, chunkCount:d.chunkCount}));
+    db.collection('vehicles').doc(v.id).set({...meta, docs:docsMeta}).catch(e=>console.warn('fsSaveVehicle', e));
+  }
+  function fsDeleteVehicle(id){
+    delete vehicles[id];
+    if(!fsReady) return;
+    db.collection('vehicles').doc(id).delete().catch(e=>console.warn('fsDeleteVehicle', e));
+  }
+  function fsUploadVehicleDoc(vehicleId, file, onDone, onError){
+    const reader = new FileReader();
+    reader.onload = async ()=>{
+      try{
+        const base64 = reader.result.split(',')[1];
+        const chunkCount = Math.ceil(base64.length / PDF_CHUNK_SIZE);
+        const docId = 'vd-'+genIdSafe();
+        if(fsReady){
+          for(let i=0;i<chunkCount;i++){
+            const chunk = base64.substring(i*PDF_CHUNK_SIZE, (i+1)*PDF_CHUNK_SIZE);
+            await db.collection('vehicleDocChunks').doc(`${docId}_${i}`).set({
+              vehicleId, docId, chunkIndex:i, chunkCount, data:chunk,
+            });
+          }
+        }
+        const doc = { id:docId, filename:file.name, mimeType:file.type||'application/pdf', size:file.size, chunkCount, _base64: fsReady ? null : base64 };
+        onDone(doc);
+      }catch(e){ console.warn('fsUploadVehicleDoc', e); onError && onError(e); }
+    };
+    reader.onerror = ()=> onError && onError(new Error('Lesefehler'));
+    reader.readAsDataURL(file);
+  }
+  async function fsDownloadVehicleDoc(vehicleId, doc){
+    let base64;
+    if(!fsReady){
+      base64 = doc._base64; // Demo/Offline-Vorschau ohne Firebase: Datei blieb nur im Speicher dieser Sitzung
+      if(!base64){ alert('Diese Datei ist nur in dieser Sitzung (ohne Firebase-Verbindung) verfügbar und kann nicht mehr geladen werden.'); return; }
+    } else {
+      const parts = [];
+      for(let i=0;i<doc.chunkCount;i++){
+        const snap = await db.collection('vehicleDocChunks').doc(`${doc.id}_${i}`).get();
+        if(!snap.exists){ alert('Ein Teil dieser Datei fehlt — Download nicht möglich.'); return; }
+        parts.push(snap.data().data);
+      }
+      base64 = parts.join('');
+    }
+    const link = document.createElement('a');
+    link.href = `data:${doc.mimeType};base64,${base64}`;
+    link.download = doc.filename;
+    document.body.appendChild(link); link.click(); link.remove();
+  }
+  function fsDeleteVehicleDoc(vehicleId, doc){
+    const v = vehicles[vehicleId];
+    if(v) v.docs = (v.docs||[]).filter(d=>d.id!==doc.id);
+    fsSaveVehicle(v);
+    if(!fsReady) return;
+    for(let i=0;i<doc.chunkCount;i++){
+      db.collection('vehicleDocChunks').doc(`${doc.id}_${i}`).delete().catch(e=>console.warn('fsDeleteVehicleDoc chunk', e));
+    }
   }
   function fsAdjustHoursEntry(idx, newHours){
     if(idx<0 || idx>=hoursLog.length) return;
@@ -1822,9 +1892,11 @@
       db.collection('meta').doc('heroPhoto').get(),
       db.collection('hours_froh-tech').get(),
       db.collection('ferienMain').get(),
+      db.collection('vehicles').get(),
+      db.collection('adminUsers').get(),
       ...GROUPS.map(g=> db.collection('bookings').doc(g.key).get())
     ]).then(results=>{
-      const [ordersSnap, invSnap, custSnap, hoursSnap, moSnap, messagesSnap, sitzungenSnap, objMetaSnap, objCostSnap, manualObjSnap, ferienSnap, contactSnap, monteureDoc, partnersDoc, teamDoc, settingsDoc, showcaseDoc, heroPhotoDoc, kalHoursSnap, ferienMainSnap, ...bookingDocs] = results;
+      const [ordersSnap, invSnap, custSnap, hoursSnap, moSnap, messagesSnap, sitzungenSnap, objMetaSnap, objCostSnap, manualObjSnap, ferienSnap, contactSnap, monteureDoc, partnersDoc, teamDoc, settingsDoc, showcaseDoc, heroPhotoDoc, kalHoursSnap, ferienMainSnap, vehiclesSnap, adminUsersSnap, ...bookingDocs] = results;
       ordersSnap.forEach(doc=>{ const o = deserializeOrder(doc.data()); orders[o.id] = o; });
       invSnap.forEach(doc=>{
         const d = doc.data();
@@ -1834,6 +1906,8 @@
       hoursSnap.forEach(doc=>{ const d = doc.data(); hoursLog.push({ orderId:d.orderId, gkey:d.gkey, monteur:d.monteur, hours:d.hours, date:new Date(d.date), fsId:doc.id, source:'main' }); });
       kalHoursSnap.forEach(doc=>{ const d = doc.data(); hoursLog.push({ orderId:d.entryId||'', gkey:null, monteur:d.monteur, hours:d.hours, date:new Date(d.date), fsId:doc.id, source:'kalender', customer:d.customer||'' }); });
       ferienMainSnap.forEach(doc=> ferienMain.push(doc.data()));
+      vehiclesSnap.forEach(doc=>{ const d = doc.data(); vehicles[d.id] = {...d, docs: d.docs||[]}; });
+      adminUsersSnap.forEach(doc=>{ adminUsers[doc.id] = doc.data(); });
       moSnap.forEach(doc=>{ const d = doc.data(); manualOffers.push({ ...d, createdAt:new Date(d.createdAt) }); });
       messagesSnap.forEach(doc=>{ const d = doc.data(); messages.push({ ...d, createdAt:new Date(d.createdAt) }); });
       sitzungenSnap.forEach(doc=>{ const d = doc.data(); sitzungen[doc.id] = { ...d, createdAt:new Date(d.createdAt) }; });
@@ -1964,6 +2038,21 @@
       snap.forEach(doc=> ferienMain.push(doc.data()));
       refreshAdmin();
     }, e=>console.warn('ferienMain listener', e));
+    db.collection('vehicles').onSnapshot(snap=>{
+      snap.docChanges().forEach(change=>{
+        const d = change.doc.data();
+        if(change.type==='removed'){ delete vehicles[change.doc.id]; }
+        else { vehicles[change.doc.id] = {...d, docs: d.docs||[]}; }
+      });
+      refreshAdmin();
+    }, e=>console.warn('vehicles listener', e));
+    db.collection('adminUsers').onSnapshot(snap=>{
+      snap.docChanges().forEach(change=>{
+        if(change.type==='removed'){ delete adminUsers[change.doc.id]; }
+        else { adminUsers[change.doc.id] = change.doc.data(); }
+      });
+      refreshAdmin();
+    }, e=>console.warn('adminUsers listener', e));
     db.collection('meta').doc('monteure').onSnapshot(doc=>{
       if(doc.exists){ monteure.length=0; (doc.data().list||[]).forEach(m=>monteure.push(m)); refreshAdmin(); renderTeamGrids(); }
     }, e=>console.warn('monteure listener', e));
@@ -2921,12 +3010,67 @@
   });
 
   /* ================= ADMIN AREA (demo/prototype — session-only) ================= */
-  const ADMIN_PASSWORD = 'froh2026';
+  const ADMIN_PASSWORD = 'froh2026'; // Notfall-Zugang, falls Firebase Authentication (noch) nicht eingerichtet ist
+  // ── Persönliche Admin-Zugänge (Firebase Authentication) ──
+  const SEED_ADMINS = [
+    {email:'a.s@froh-tech.ch', name:'Ajdin.s'},
+    {email:'a.dc@froh-tech.ch', name:'Alessandro. D'},
+    {email:'uf@froh-tech.ch', name:'Urim F.'},
+    {email:'rf@froh-tech.ch', name:'Roland F.'},
+    {email:'cs@froh-tech.ch', name:'Claudio S.'},
+  ];
+  const SEED_PASSWORD = '1234';
+  const adminUsers = {}; // email(klein) -> {email, name, role:'admin'|'mitarbeiter'|'pending', mustChangePassword, createdAt, approvedBy}
+  let authUser = null;   // aktuell angemeldeter Firebase-Auth-Benutzer (oder null)
+  let seedAdminsDone = false;
+  function fsSaveAdminUser(u){
+    if(!fsReady) return;
+    db.collection('adminUsers').doc(u.email).set(u).catch(e=>console.warn('fsSaveAdminUser', e));
+  }
+  async function ensureSeedAdmins(){
+    if(seedAdminsDone || !fsReady || !window.firebase || !firebase.auth) return;
+    seedAdminsDone = true;
+    for(const seed of SEED_ADMINS){
+      const email = seed.email.toLowerCase();
+      try{
+        // Existiert das Konto in Firebase Authentication noch nicht, wird es hier mit dem
+        // Startpasswort 1234 angelegt. Existiert es schon, schlägt das erwartungsgemäss fehl
+        // und wir tun nichts weiter (kein Passwort-Reset, keine Überschreibung).
+        const cred = await firebase.auth().createUserWithEmailAndPassword(email, SEED_PASSWORD);
+        await firebase.auth().signOut(); // nicht als dieses Konto eingeloggt bleiben
+        if(!adminUsers[email]){
+          const u = { email, name:seed.name, role:'admin', mustChangePassword:true, createdAt:new Date().toISOString(), approvedBy:'system' };
+          adminUsers[email] = u;
+          fsSaveAdminUser(u);
+        }
+      }catch(e){
+        // 'auth/email-already-in-use' ist der Normalfall bei jedem weiteren Seitenaufruf.
+        if(e.code!=='auth/email-already-in-use') console.warn('ensureSeedAdmins', seed.email, e);
+        // Firestore-Eintrag trotzdem sicherstellen, falls er (z. B. nach einem Reset) fehlt.
+        if(!adminUsers[email]){
+          const u = { email, name:seed.name, role:'admin', mustChangePassword:true, createdAt:new Date().toISOString(), approvedBy:'system' };
+          adminUsers[email] = u;
+          fsSaveAdminUser(u);
+        }
+      }
+    }
+  }
   let adminOpen = false, adminTab = 'anfragen';
   let currentAdminEmail = (typeof localStorage!=='undefined' && localStorage.getItem('froh_admin_user_email')) || '';
   function currentAdminName(){
+    if(!currentAdminEmail) return '';
+    const u = adminUsers[currentAdminEmail];
+    if(u) return u.name;
     const p = partners.find(p=>p.email && p.email.toLowerCase()===currentAdminEmail.toLowerCase());
     return p ? p.name : '';
+  }
+  function currentAdminRole(){
+    if(!currentAdminEmail) return null;
+    const u = adminUsers[currentAdminEmail];
+    return u ? u.role : 'admin'; // Notfall-Zugang (ADMIN_PASSWORD) zählt als voller Admin
+  }
+  function countPendingAdminUsers(){
+    return Object.values(adminUsers).filter(u=>u.role==='pending').length;
   }
   function openWhoAmIModal(){
     const options = partners.filter(p=>p.email);
@@ -3567,40 +3711,153 @@
     const root = $('#admin-root');
     root.innerHTML = `
       <div class="admin-overlay" id="admin-login-overlay">
-        <div class="admin-login-box">
+        <div class="admin-login-box" style="max-width:380px;">
           <h3>Admin-Login</h3>
           <p>Nur für Froh Haustechnik intern.</p>
-          <input type="password" id="admin-pw" placeholder="Passwort">
-          <p class="admin-err" id="admin-err">Falsches Passwort.</p>
-          <div style="display:flex;gap:10px;">
+          <input type="email" id="admin-email" placeholder="E-Mail" autocomplete="username">
+          <input type="password" id="admin-pw" placeholder="Passwort" autocomplete="current-password" style="margin-top:8px;">
+          <p class="admin-err" id="admin-err" style="display:none;">Falsche E-Mail oder falsches Passwort.</p>
+          <div style="display:flex;gap:10px;margin-top:10px;">
             <button class="btn btn-primary btn-sm" id="admin-login-btn">Anmelden</button>
             <button class="btn btn-ghost btn-sm" id="admin-cancel-btn" style="color:var(--adm-fg);border-color:rgba(var(--adm-fg-rgb),.3);">Abbrechen</button>
           </div>
+          <p style="margin-top:16px;font-size:12.5px;text-align:center;">
+            <a href="#" id="admin-register-link" style="color:var(--accent);">Noch kein Zugang? Registrieren</a>
+          </p>
         </div>
       </div>`;
     $('#admin-cancel-btn').addEventListener('click', ()=> root.innerHTML='');
     $('#admin-login-btn').addEventListener('click', tryAdminLogin);
     $('#admin-pw').addEventListener('keydown', e=>{ if(e.key==='Enter') tryAdminLogin(); });
+    $('#admin-register-link').addEventListener('click', (e)=>{ e.preventDefault(); openAdminRegister(); });
     applyAdminTheme();
-    $('#admin-pw').focus();
+    $('#admin-email').focus();
   }
-  function tryAdminLogin(){
-    if($('#admin-pw').value === ADMIN_PASSWORD){ openAdminPanel(); }
-    else { $('#admin-err').style.display='block'; }
+  async function tryAdminLogin(){
+    const email = $('#admin-email').value.trim().toLowerCase();
+    const pw = $('#admin-pw').value;
+    const errEl = $('#admin-err');
+    errEl.style.display = 'none';
+    if(!fsReady || !window.firebase || !firebase.auth){
+      // Notfall-Zugang ohne Firebase-Verbindung (z. B. lokale Vorschau)
+      if(pw === ADMIN_PASSWORD){ currentAdminEmail=''; openAdminPanel(); }
+      else { errEl.textContent = 'Falsches Passwort.'; errEl.style.display='block'; }
+      return;
+    }
+    if(!email || !pw){ errEl.textContent = 'Bitte E-Mail und Passwort eingeben.'; errEl.style.display='block'; return; }
+    try{
+      const cred = await firebase.auth().signInWithEmailAndPassword(email, pw);
+      authUser = cred.user;
+      const u = adminUsers[email];
+      if(!u || u.role==='pending'){
+        errEl.textContent = 'Dieser Zugang wurde noch nicht von einem Admin freigegeben.';
+        errEl.style.display = 'block';
+        await firebase.auth().signOut();
+        authUser = null;
+        return;
+      }
+      currentAdminEmail = email;
+      try{ localStorage.setItem('froh_admin_user_email', email); }catch(ex){}
+      if(u.mustChangePassword){ openForcePasswordChange(u); return; }
+      openAdminPanel();
+    }catch(e){
+      if(e.code==='auth/wrong-password' || e.code==='auth/invalid-credential' || e.code==='auth/invalid-login-credentials'){ errEl.textContent = 'Falsche E-Mail oder falsches Passwort.'; }
+      else if(e.code==='auth/user-not-found'){ errEl.textContent = 'Diese E-Mail ist nicht registriert.'; }
+      else if(e.code==='auth/too-many-requests'){ errEl.textContent = 'Zu viele Versuche — bitte kurz warten.'; }
+      else { errEl.textContent = 'Anmeldung fehlgeschlagen: '+(e.message||e.code||e); }
+      errEl.style.display = 'block';
+    }
+  }
+  function openAdminRegister(){
+    const root = $('#admin-root');
+    root.innerHTML = `
+      <div class="admin-overlay" id="admin-register-overlay">
+        <div class="admin-login-box" style="max-width:380px;">
+          <h3>Zugang beantragen</h3>
+          <p>Ein bestehender Admin muss deine Anfrage danach freigeben, bevor du dich anmelden kannst.</p>
+          <input type="text" id="reg-name" placeholder="Name Vorname" style="margin-bottom:8px;">
+          <input type="email" id="reg-email" placeholder="E-Mail" autocomplete="username" style="margin-bottom:8px;">
+          <input type="password" id="reg-pw" placeholder="Passwort wählen" autocomplete="new-password">
+          <p class="admin-err" id="reg-err" style="display:none;"></p>
+          <p class="admin-ok" id="reg-ok" style="display:none;color:#2fae4e;font-size:13px;margin-top:8px;">Anfrage gesendet — bitte warte auf die Freigabe.</p>
+          <div style="display:flex;gap:10px;margin-top:10px;">
+            <button class="btn btn-primary btn-sm" id="reg-submit-btn">Anfrage senden</button>
+            <button class="btn btn-ghost btn-sm" id="reg-back-btn" style="color:var(--adm-fg);border-color:rgba(var(--adm-fg-rgb),.3);">Zurück</button>
+          </div>
+        </div>
+      </div>`;
+    $('#reg-back-btn').addEventListener('click', openAdminLogin);
+    $('#reg-submit-btn').addEventListener('click', async ()=>{
+      const name = $('#reg-name').value.trim();
+      const email = $('#reg-email').value.trim().toLowerCase();
+      const pw = $('#reg-pw').value;
+      const errEl = $('#reg-err');
+      errEl.style.display = 'none';
+      if(!name || !email || pw.length<6){ errEl.textContent='Bitte Name, E-Mail und ein Passwort mit mind. 6 Zeichen angeben.'; errEl.style.display='block'; return; }
+      if(!fsReady || !window.firebase || !firebase.auth){ errEl.textContent='Keine Firebase-Verbindung — Registrierung nicht möglich.'; errEl.style.display='block'; return; }
+      try{
+        await firebase.auth().createUserWithEmailAndPassword(email, pw);
+        await firebase.auth().signOut();
+        const u = { email, name, role:'pending', mustChangePassword:false, createdAt:new Date().toISOString() };
+        adminUsers[email] = u;
+        fsSaveAdminUser(u);
+        $('#reg-submit-btn').style.display='none';
+        $('#reg-ok').style.display='block';
+      }catch(e){
+        if(e.code==='auth/email-already-in-use') errEl.textContent = 'Diese E-Mail ist bereits registriert — bitte stattdessen anmelden.';
+        else errEl.textContent = 'Registrierung fehlgeschlagen: '+(e.message||e.code||e);
+        errEl.style.display = 'block';
+      }
+    });
+    applyAdminTheme();
+    $('#reg-name').focus();
+  }
+  function openForcePasswordChange(u){
+    const root = $('#admin-root');
+    root.innerHTML = `
+      <div class="admin-overlay" id="admin-forcepw-overlay">
+        <div class="admin-login-box" style="max-width:380px;">
+          <h3>Neues Passwort festlegen</h3>
+          <p>Beim ersten Anmelden muss ein eigenes Passwort gewählt werden (statt des zugeteilten Startpassworts).</p>
+          <input type="password" id="new-pw-1" placeholder="Neues Passwort (mind. 6 Zeichen)" style="margin-bottom:8px;">
+          <input type="password" id="new-pw-2" placeholder="Neues Passwort wiederholen">
+          <p class="admin-err" id="forcepw-err" style="display:none;"></p>
+          <div style="display:flex;gap:10px;margin-top:10px;">
+            <button class="btn btn-primary btn-sm" id="forcepw-save-btn">Passwort speichern</button>
+          </div>
+        </div>
+      </div>`;
+    $('#forcepw-save-btn').addEventListener('click', async ()=>{
+      const p1 = $('#new-pw-1').value, p2 = $('#new-pw-2').value;
+      const errEl = $('#forcepw-err');
+      errEl.style.display = 'none';
+      if(p1.length<6){ errEl.textContent='Mindestens 6 Zeichen.'; errEl.style.display='block'; return; }
+      if(p1!==p2){ errEl.textContent='Die beiden Passwörter stimmen nicht überein.'; errEl.style.display='block'; return; }
+      try{
+        await firebase.auth().currentUser.updatePassword(p1);
+        u.mustChangePassword = false;
+        adminUsers[u.email] = u;
+        fsSaveAdminUser(u);
+        openAdminPanel();
+      }catch(e){ errEl.textContent = 'Fehler: '+(e.message||e.code||e); errEl.style.display='block'; }
+    });
+    applyAdminTheme();
+    $('#new-pw-1').focus();
   }
 
   function openAdminPanel(){
     adminOpen = true;
     const root = $('#admin-root');
+    const isMitarbeiter = currentAdminRole()==='mitarbeiter';
     root.innerHTML = `
       <div class="admin-panel" id="admin-panel">
         <div class="admin-topbar">
           <div class="admin-brand"><span class="admin-brand-mark">${(SETTINGS.name||'F').charAt(0)}</span><strong>${SETTINGS.name}</strong></div>
           <div style="display:flex;align-items:center;gap:16px;">
-            <button class="btn btn-secondary btn-sm" id="admin-whoami-btn">👤 ${currentAdminName() || 'Wer bist du?'}</button>
+            <span style="font-size:13px;color:rgba(var(--adm-fg-rgb),.75);">👤 ${currentAdminName() || currentAdminEmail || 'Admin'}${isMitarbeiter?' · Mitarbeiter':''}</span>
             <span id="fs-live-badge" style="font-size:12.5px;color:#ffb454;">🟡 Verbinde …</span>
             <button class="theme-toggle-btn" id="theme-toggle-btn">${adminTheme==='light'?'☀️ Hell':'🌙 Dunkel'}</button>
-            <button class="btn btn-secondary btn-sm" id="admin-close-btn">Schliessen</button>
+            <button class="btn btn-secondary btn-sm" id="admin-close-btn">Abmelden</button>
           </div>
         </div>
         <div class="admin-tabs">
@@ -3611,14 +3868,18 @@
           <button class="admin-tab" data-tab="kalender"><span class="admin-tab-icon">📅</span>Kalender</button>
           <button class="admin-tab" data-tab="archiv"><span class="admin-tab-icon">📊</span>Statistik</button>
           <button class="admin-tab" data-tab="mitarbeiter"><span class="admin-tab-icon">👷</span>Mitarbeiter</button>
+          <button class="admin-tab" data-tab="fahrzeuge"><span class="admin-tab-icon">🚗</span>Fahrzeuge</button>
           <button class="admin-tab" data-tab="dashboard"><span class="admin-tab-icon">💬</span>Nachrichten<span class="admin-tab-badge" id="badge-dashboard"></span></button>
-          <button class="admin-tab" data-tab="einstellungen"><span class="admin-tab-icon">⚙️</span>Einstellungen</button>
+          ${!isMitarbeiter ? `<button class="admin-tab" data-tab="einstellungen"><span class="admin-tab-icon">⚙️</span>Einstellungen${countPendingAdminUsers()>0?`<span class="admin-tab-badge">${countPendingAdminUsers()}</span>`:''}</button>` : ''}
         </div>
         <div class="admin-body" id="admin-body"></div>
         <div id="froh-kalender-overlay-root"></div>
       </div>`;
-    $('#admin-close-btn').addEventListener('click', ()=>{ adminOpen=false; root.innerHTML=''; });
-    $('#admin-whoami-btn').addEventListener('click', openWhoAmIModal);
+    $('#admin-close-btn').addEventListener('click', ()=>{
+      adminOpen=false; root.innerHTML='';
+      if(window.firebase && firebase.auth && firebase.auth().currentUser) firebase.auth().signOut().catch(()=>{});
+      authUser = null;
+    });
     $('#theme-toggle-btn').addEventListener('click', ()=>{
       adminTheme = adminTheme==='light' ? 'dark' : 'light';
       localStorage.setItem('froh_admin_theme', adminTheme);
@@ -3633,7 +3894,9 @@
     adminTab = 'anfragen';
     renderAdminTabs();
     renderAdminBody();
-    if(!currentAdminEmail && partners.some(p=>p.email)) openWhoAmIModal();
+    // Die alte "Wer bist du?"-Auswahl wird nur noch für den Notfall-Zugang ohne echten
+    // Firebase-Login gebraucht — mit E-Mail-Login ist die Identität ja bereits bekannt.
+    if(!currentAdminEmail && !authUser && partners.some(p=>p.email)) openWhoAmIModal();
   }
   function renderAdminTabs(){
     $all('.admin-tab').forEach(b=> b.classList.toggle('active', b.dataset.tab===adminTab));
@@ -3686,15 +3949,31 @@
     const body = $('#admin-body');
     if(!body) return;
     body.classList.toggle('admin-body-wide', adminTab==='kalender');
-    if(adminTab==='anfragen') body.innerHTML = adminAnfragenHtml();
-    else if(adminTab==='kalender') body.innerHTML = adminKalenderHtml();
-    else if(adminTab==='auftraege') body.innerHTML = adminAuftraegeHtml();
-    else if(adminTab==='rechnungen') body.innerHTML = adminRechnungenHtml();
-    else if(adminTab==='archiv') body.innerHTML = adminArchivHtml();
-    else if(adminTab==='kunden') body.innerHTML = adminKundenHtml();
-    else if(adminTab==='dashboard') body.innerHTML = adminDashboardHtml();
-    else if(adminTab==='mitarbeiter') body.innerHTML = adminMitarbeiterHtml();
-    else if(adminTab==='einstellungen') body.innerHTML = adminEinstellungenHtml();
+    try{
+      if(adminTab==='anfragen') body.innerHTML = adminAnfragenHtml();
+      else if(adminTab==='kalender') body.innerHTML = adminKalenderHtml();
+      else if(adminTab==='auftraege') body.innerHTML = adminAuftraegeHtml();
+      else if(adminTab==='rechnungen') body.innerHTML = adminRechnungenHtml();
+      else if(adminTab==='archiv') body.innerHTML = adminArchivHtml();
+      else if(adminTab==='kunden') body.innerHTML = adminKundenHtml();
+      else if(adminTab==='dashboard') body.innerHTML = adminDashboardHtml();
+      else if(adminTab==='mitarbeiter') body.innerHTML = adminMitarbeiterHtml();
+      else if(adminTab==='fahrzeuge') body.innerHTML = adminFahrzeugeHtml();
+      else if(adminTab==='einstellungen'){
+        if(currentAdminRole()==='mitarbeiter'){
+          body.innerHTML = `<div class="admin-empty">Diese Seite ist nur für Admins zugänglich.</div>`;
+        } else {
+          body.innerHTML = adminEinstellungenHtml();
+        }
+      }
+    }catch(e){
+      console.error('renderAdminBody Fehler bei Tab', adminTab, e);
+      body.innerHTML = `<div class="admin-card" style="padding:24px;">
+        <div style="font-weight:700;color:#ff6b62;margin-bottom:8px;">⚠️ Diese Seite konnte nicht geladen werden.</div>
+        <div class="folder-meta">Fehlermeldung: ${(e && e.message ? e.message : String(e)).replace(/</g,'&lt;')}</div>
+        <p class="admin-settings-hint" style="margin-top:10px;">Bitte diesen Text an den Entwickler weitergeben — damit lässt sich die Ursache finden.</p>
+      </div>`;
+    }
     wireAdminBody();
   }
 
@@ -3937,6 +4216,18 @@
       </div>`);
   }
 
+  function installedElementsInRange(from, to){
+    // Zählt alle von Monteuren im Froh-Kalender eingegebenen Stückzahlen (progressLog)
+    // im Zeitraum [von, bis) — unabhängig vom Auftragstyp (Montage/Beplankung/Ausflockung usw.).
+    let total = 0;
+    liveKalenderEntries.forEach(e=>{
+      (e.progressLog||[]).forEach(p=>{
+        const d = new Date(p.date);
+        if(d>=from && d<to) total += parseFloat(p.qty)||0;
+      });
+    });
+    return total;
+  }
   function computeMonthStats(year, month){
     const inMonth = (d) => d && d.getFullYear()===year && d.getMonth()===month;
     let onlineAnfragen=0, manuelleOfferten=0, montage=0, beplankung=0, silentpanels=0, ausflockung=0, beplankungM2=0, ausflockungM3=0;
@@ -4013,6 +4304,25 @@
             ${delta ? `<div style="font-size:12.5px;font-weight:700;color:${delta.up?'#16a34a':'#dc3545'};">${delta.up?'▲':'▼'} ${delta.pct}% ggü. Vormonat</div>` : `<div style="font-size:12.5px;color:rgba(var(--adm-fg-rgb),.4);">kein Vergleichswert</div>`}
           </div>`;
         }).join('')}
+      </div>
+      <div class="settings-section-label">🔧 Montierte Elemente (aus dem Froh-Kalender)</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;">
+        ${(()=>{
+          const dayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+          const dayEnd = addDays(dayStart,1);
+          const weekStart = mondayOf(today);
+          const weekEnd = addDays(weekStart,7);
+          const rows = [
+            {label:'Heute', val: installedElementsInRange(dayStart, dayEnd)},
+            {label:'Diese Woche', val: installedElementsInRange(weekStart, weekEnd)},
+            {label:monthLabel, val: installedElementsInRange(new Date(y,m,1), new Date(y,m+1,1))},
+            {label:'Dieses Jahr', val: installedElementsInRange(new Date(y,0,1), new Date(y+1,0,1))},
+          ];
+          return rows.map(r=>`<div class="admin-card" style="padding:16px;">
+            <div style="font-size:12px;color:rgba(var(--adm-fg-rgb),.55);font-weight:700;text-transform:uppercase;letter-spacing:.03em;">${r.label}</div>
+            <div style="font-size:28px;font-weight:800;color:var(--adm-fg);margin:6px 0 4px;">${r.val}</div>
+          </div>`).join('');
+        })()}
       </div>
       <div class="admin-card" style="margin-bottom:18px;">
         <div class="settings-section-label" style="margin-top:0;">Verteilung — ${monthLabel}</div>
@@ -5664,6 +5974,57 @@
     return html;
   }
 
+  let vehicleExpanded = null;
+  function adminFahrzeugeHtml(){
+    let html = `${pageHeaderHtml('🚗','Fahrzeuge','Firmenfahrzeuge, Polices, Fahrzeugausweise und wer welches Fahrzeug fährt.')}`;
+    html += `<div class="admin-actions" style="margin-bottom:16px;"><button class="btn btn-primary btn-sm" id="new-vehicle-btn">+ Fahrzeug hinzufügen</button></div>`;
+    const list = Object.values(vehicles).sort((a,b)=> (a.kennzeichen||'').localeCompare(b.kennzeichen||''));
+    if(!list.length){ html += `<div class="admin-empty">Noch keine Fahrzeuge erfasst.</div>`; return html; }
+    html += `<div class="folder-list">` + list.map(v=>{
+      const expanded = vehicleExpanded===v.id;
+      return `
+      <div class="admin-card" data-vehicle="${v.id}" style="padding:14px 18px;">
+        <div class="admin-row" style="align-items:center;cursor:pointer;" data-act="toggle-vehicle">
+          <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">
+            <span style="font-size:14px;font-weight:650;color:var(--adm-fg);">🚗 ${v.kennzeichen||'(kein Kennzeichen)'}</span>
+            <span class="folder-meta">${v.marke||''} ${v.modell||''}</span>
+            ${v.monteur ? `<span class="admin-badge team">👤 ${v.monteur}</span>` : `<span class="folder-meta">Keinem Monteur zugeteilt</span>`}
+            ${(v.docs||[]).length ? `<span class="folder-meta">📎 ${v.docs.length} Dokument${v.docs.length!==1?'e':''}</span>` : ''}
+          </div>
+          <span style="font-size:13px;color:rgba(var(--adm-fg-rgb),.5);">${expanded?'▲':'▼'}</span>
+        </div>
+        ${expanded ? `
+          <div style="margin-top:14px;">
+            <div class="admin-grid2">
+              <div class="admin-field" style="margin-bottom:8px;"><label>Kennzeichen</label><input type="text" class="veh-field" data-field="kennzeichen" data-vehicle="${v.id}" value="${v.kennzeichen||''}"></div>
+              <div class="admin-field" style="margin-bottom:8px;"><label>Marke / Modell</label><input type="text" class="veh-field" data-field="markeModell" data-vehicle="${v.id}" value="${(v.marke||'')+(v.modell?' '+v.modell:'')}"></div>
+              <div class="admin-field" style="margin-bottom:8px;"><label>Policen-Nr. (Versicherung)</label><input type="text" class="veh-field" data-field="policenNr" data-vehicle="${v.id}" value="${v.policenNr||''}"></div>
+              <div class="admin-field" style="margin-bottom:8px;"><label>Stammnr. Fahrzeugausweis</label><input type="text" class="veh-field" data-field="fahrzeugscheinNr" data-vehicle="${v.id}" value="${v.fahrzeugscheinNr||''}"></div>
+              <div class="admin-field" style="margin-bottom:8px;"><label>Zugeteilter Monteur</label>
+                <select class="veh-field" data-field="monteur" data-vehicle="${v.id}">
+                  <option value="">— niemand —</option>
+                  ${monteure.map(m=>`<option value="${m.name}" ${v.monteur===m.name?'selected':''}>${m.name}</option>`).join('')}
+                </select>
+              </div>
+              <div class="admin-field" style="margin-bottom:8px;"><label>Notizen</label><input type="text" class="veh-field" data-field="notes" data-vehicle="${v.id}" value="${v.notes||''}"></div>
+            </div>
+            <div class="settings-section-label">Unterlagen (PDF, Fotos usw.)</div>
+            ${(v.docs||[]).length ? `<table class="admin-table"><thead><tr><th>Datei</th><th>Grösse</th><th></th></tr></thead>
+              <tbody>${v.docs.map(d=>`<tr><td>📎 ${d.filename}</td><td>${(d.size/1024/1024).toFixed(2)} MB</td><td style="display:flex;gap:6px;"><button class="obj-mini veh-doc-download" data-vehicle="${v.id}" data-doc="${d.id}">⬇️ Herunterladen</button><button class="obj-mini danger veh-doc-delete" data-vehicle="${v.id}" data-doc="${d.id}">🗑️</button></td></tr>`).join('')}</tbody>
+            </table>` : `<div class="admin-empty" style="padding:8px 0;">Noch keine Unterlagen hochgeladen.</div>`}
+            <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+              <input type="file" class="veh-doc-upload" data-vehicle="${v.id}" accept="application/pdf,image/*">
+              <span class="veh-upload-status" data-vehicle="${v.id}" style="font-size:12px;color:rgba(var(--adm-fg-rgb),.5);"></span>
+            </div>
+            <div class="admin-actions" style="margin-top:14px;">
+              <button class="btn btn-ghost btn-sm danger" id="delete-vehicle-btn" data-vehicle="${v.id}" style="color:#ff6b62;border-color:rgba(255,59,48,.4);">🗑️ Fahrzeug löschen</button>
+            </div>
+          </div>` : ''}
+      </div>`;
+    }).join('') + `</div>`;
+    return html;
+  }
+
   let dashboardSubTab = 'nachrichten'; // 'nachrichten' | 'sitzungen' | 'aufgaben'
   let msgViewMode = 'erhalten'; // 'erhalten' | 'gesendet'
   function adminDashboardHtml(){
@@ -5984,6 +6345,37 @@
       html += `
       <div class="settings-panel-title">👥 Team &amp; Monteure</div>
       <p class="settings-panel-sub">Monteure sind nur intern (Mitarbeiter-Verwaltung, Froh-Kalender) — sie erscheinen NICHT auf der öffentlichen Webseite. Das Team unten (Geschäftsleitung usw.) erscheint mit Foto auf der öffentlichen Team-Seite.</p>
+      <div class="settings-section-label">🔐 Admin-Zugänge</div>
+      ${countPendingAdminUsers()>0 ? `
+        <div class="admin-card" style="border-color:rgba(255,159,10,.5);">
+          <div style="font-weight:650;color:#ffb454;margin-bottom:8px;">⏳ Wartet auf Freigabe</div>
+          ${Object.values(adminUsers).filter(u=>u.role==='pending').map(u=>`
+            <div class="apparat-row" style="flex-wrap:wrap;gap:8px;">
+              <span>${u.name} · ${u.email}</span>
+              <span style="display:flex;gap:6px;margin-left:auto;">
+                <select class="pending-role-select" data-email="${u.email}">
+                  <option value="mitarbeiter">Mitarbeiter</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <button class="obj-mini primary approve-admin-btn" data-email="${u.email}">✓ Freigeben</button>
+                <button class="obj-mini danger reject-admin-btn" data-email="${u.email}">🗑️ Ablehnen</button>
+              </span>
+            </div>`).join('')}
+        </div>` : ''}
+      <div class="admin-card">
+        <div style="font-weight:650;color:var(--adm-fg);margin-bottom:8px;">Bestehende Zugänge</div>
+        ${Object.values(adminUsers).filter(u=>u.role!=='pending').map(u=>`
+          <div class="apparat-row" style="flex-wrap:wrap;gap:8px;">
+            <span>${u.name} · ${u.email}${u.mustChangePassword?' <span class="folder-meta">(Startpasswort noch nicht geändert)</span>':''}</span>
+            <span style="display:flex;gap:6px;margin-left:auto;">
+              <select class="role-change-select" data-email="${u.email}">
+                <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
+                <option value="mitarbeiter" ${u.role==='mitarbeiter'?'selected':''}>Mitarbeiter</option>
+              </select>
+              ${u.email!==currentAdminEmail ? `<button class="obj-mini danger remove-admin-btn" data-email="${u.email}">🗑️ Zugang entfernen</button>` : `<span class="folder-meta">(du)</span>`}
+            </span>
+          </div>`).join('') || '<div class="admin-empty">Noch keine Zugänge erfasst.</div>'}
+      </div>
       <div class="settings-section-label">Arbeitszeit</div>
       <div class="admin-card">
         <div class="admin-field" style="max-width:220px;margin-bottom:0;"><label>Arbeitswoche (Stunden)</label><input type="number" id="set-wochenstunden" value="${SETTINGS.wochenstunden}" min="1" max="60" step="0.5"></div>
@@ -6133,6 +6525,42 @@
       SETTINGS.skontoDays = parseInt($('#set-skonto-days').value)||0;
       fsSaveSettings();
       alert(fsReady ? 'Zahlungskonditionen gespeichert und live synchronisiert.' : 'Zahlungskonditionen gespeichert (nur für diese Sitzung/Vorführung — keine Firebase-Verbindung).');
+    });
+    $all('.approve-admin-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const email = btn.dataset.email;
+        const u = adminUsers[email];
+        const role = $(`.pending-role-select[data-email="${email}"]`).value;
+        u.role = role; u.approvedBy = currentAdminEmail; u.approvedAt = new Date().toISOString();
+        fsSaveAdminUser(u);
+        renderAdminBody();
+      });
+    });
+    $all('.reject-admin-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        confirmDangerAction('Anfrage ablehnen?', btn.dataset.email+' wird entfernt.', ()=>{
+          delete adminUsers[btn.dataset.email];
+          if(fsReady) db.collection('adminUsers').doc(btn.dataset.email).delete().catch(e=>console.warn('reject admin', e));
+          renderAdminBody();
+        });
+      });
+    });
+    $all('.role-change-select').forEach(sel=>{
+      sel.addEventListener('change', ()=>{
+        const u = adminUsers[sel.dataset.email];
+        if(!u) return;
+        u.role = sel.value;
+        fsSaveAdminUser(u);
+      });
+    });
+    $all('.remove-admin-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        confirmDangerAction('Zugang entfernen?', btn.dataset.email+' kann sich danach nicht mehr anmelden (Firebase-Auth-Konto bleibt bestehen, wird aber nicht mehr freigeschaltet).', ()=>{
+          delete adminUsers[btn.dataset.email];
+          if(fsReady) db.collection('adminUsers').doc(btn.dataset.email).delete().catch(e=>console.warn('remove admin', e));
+          renderAdminBody();
+        });
+      });
     });
     const wochenstundenBtn = $('#save-wochenstunden-btn');
     if(wochenstundenBtn) wochenstundenBtn.addEventListener('click', ()=>{
@@ -6983,6 +7411,75 @@
         renderAdminBody();
       });
     });
+    if($('#new-vehicle-btn')) $('#new-vehicle-btn').addEventListener('click', ()=>{
+      const id = 'veh-'+genIdSafe();
+      vehicles[id] = { id, kennzeichen:'', marke:'', modell:'', policenNr:'', fahrzeugscheinNr:'', monteur:'', notes:'', docs:[] };
+      fsSaveVehicle(vehicles[id]);
+      vehicleExpanded = id;
+      renderAdminBody();
+    });
+    $all('[data-act="toggle-vehicle"]').forEach(row=>{
+      row.addEventListener('click', ()=>{
+        const id = row.closest('[data-vehicle]').dataset.vehicle;
+        vehicleExpanded = vehicleExpanded===id ? null : id;
+        renderAdminBody();
+      });
+    });
+    $all('.veh-field').forEach(el=>{
+      el.addEventListener('change', ()=>{
+        const v = vehicles[el.dataset.vehicle];
+        if(!v) return;
+        if(el.dataset.field==='markeModell'){
+          const parts = el.value.trim().split(' ');
+          v.marke = parts.shift()||''; v.modell = parts.join(' ');
+        } else {
+          v[el.dataset.field] = el.value;
+        }
+        fsSaveVehicle(v);
+      });
+    });
+    $all('.veh-doc-upload').forEach(input=>{
+      input.addEventListener('change', ()=>{
+        const file = input.files[0];
+        if(!file) return;
+        const vehicleId = input.dataset.vehicle;
+        const v = vehicles[vehicleId];
+        const status = $(`.veh-upload-status[data-vehicle="${vehicleId}"]`);
+        if(file.size > 25*1024*1024){ if(status) status.textContent = 'Datei zu gross (max. 25 MB).'; return; }
+        if(status) status.textContent = 'Lädt hoch und wird in Teile zerlegt …';
+        fsUploadVehicleDoc(vehicleId, file, (doc)=>{
+          v.docs = v.docs || [];
+          v.docs.push(doc);
+          fsSaveVehicle(v);
+          if(status) status.textContent = '';
+          renderAdminBody();
+        }, ()=>{ if(status) status.textContent = 'Hochladen fehlgeschlagen.'; });
+      });
+    });
+    $all('.veh-doc-download').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const v = vehicles[btn.dataset.vehicle];
+        const doc = (v.docs||[]).find(d=>d.id===btn.dataset.doc);
+        if(doc) fsDownloadVehicleDoc(v.id, doc);
+      });
+    });
+    $all('.veh-doc-delete').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const v = vehicles[btn.dataset.vehicle];
+        const doc = (v.docs||[]).find(d=>d.id===btn.dataset.doc);
+        if(doc){ confirmDangerAction('Unterlage löschen?', doc.filename+' wird endgültig entfernt.', ()=>{ fsDeleteVehicleDoc(v.id, doc); renderAdminBody(); }); }
+      });
+    });
+    if($('#delete-vehicle-btn')) $('#delete-vehicle-btn').addEventListener('click', (e)=>{
+      const id = e.target.dataset.vehicle;
+      const v = vehicles[id];
+      confirmDangerAction('Fahrzeug löschen?', (v.kennzeichen||'Dieses Fahrzeug')+' wird endgültig entfernt.', ()=>{
+        (v.docs||[]).forEach(d=> fsDeleteVehicleDoc(id, d));
+        fsDeleteVehicle(id);
+        vehicleExpanded = null;
+        renderAdminBody();
+      });
+    });
     $all('.mit-hours-save').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const idx = parseInt(btn.dataset.idx);
@@ -7372,6 +7869,7 @@
     refreshAdmin();
     attachLiveListeners();
     renderOverviewGrid();
+    ensureSeedAdmins();
   });
 })();
 </script>
