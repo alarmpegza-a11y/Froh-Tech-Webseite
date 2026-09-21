@@ -62,9 +62,9 @@
     -webkit-backdrop-filter:saturate(180%) blur(16px);
     border-bottom:1px solid rgba(0,0,0,.06);
   }
-  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:64px;}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:84px;}
   .nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none;}
-  .nav-brand img{height:58px;width:auto;}
+  .nav-brand img{height:74px;width:auto;}
   .nav-links{display:flex;align-items:center;gap:30px;}
   .nav-links a{font-size:14.5px;text-decoration:none;color:var(--ink);opacity:.82;}
   .nav-links a:hover{opacity:1;}
@@ -367,6 +367,13 @@
   .offer-totals .t-line{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;color:#444;}
   .offer-totals .t-grand{display:flex;justify-content:space-between;font-size:17px;font-weight:700;padding-top:10px;margin-top:6px;border-top:1.5px solid #1d1d1f;color:#1d1d1f;}
   .offer-period{margin:22px 0;padding:14px 16px;background:#f5f5f7;border-radius:10px;font-size:13px;}
+  .payment-info{display:flex;justify-content:space-between;align-items:center;gap:20px;margin:18px 0 0;padding:16px 18px;border:1.5px solid #1d1d1f;border-radius:10px;}
+  .payment-info .pi-text{font-size:12.5px;line-height:1.75;color:#1d1d1f;}
+  .payment-info .pi-text .pi-title{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#888;margin-bottom:6px;}
+  .payment-info .pi-text .pi-iban{font-weight:700;font-size:14px;letter-spacing:.02em;}
+  .payment-info .pi-qr{flex:0 0 auto;text-align:center;}
+  .payment-info .pi-qr img{width:110px;height:110px;display:block;}
+  .payment-info .pi-qr .pi-qr-cap{font-size:9.5px;color:#888;margin-top:4px;max-width:110px;}
   .offer-footer{margin-top:36px;padding-top:16px;border-top:1px solid #e5e5e7;font-size:11px;color:#777;line-height:1.7;}
   /* ================= Admin ================= */
   #admin-root{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;}
@@ -605,11 +612,11 @@
   .obj-header-meta{font-size:11.5px;color:rgba(var(--adm-fg-rgb),.5);margin-top:2px;}
   .obj-header-actions{display:flex;gap:5px;flex-wrap:wrap;}
   .obj-section{
-    background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.09);
+    background:rgba(var(--adm-fg-rgb),.025);border:1px solid rgba(var(--adm-fg-rgb),.09);
     border-radius:10px;padding:12px 16px;margin-bottom:9px;
   }
   .obj-section-title{
-    font-size:10.5px;font-weight:700;color:rgba(255,255,255,.45);text-transform:uppercase;
+    font-size:10.5px;font-weight:700;color:rgba(var(--adm-fg-rgb),.45);text-transform:uppercase;
     letter-spacing:.04em;margin:0 0 8px;display:flex;justify-content:space-between;align-items:center;
   }
   .obj-list-item{
@@ -619,10 +626,10 @@
   .obj-list-item:last-child{border-bottom:none;}
   .obj-empty{font-size:12px;color:rgba(var(--adm-fg-rgb),.35);padding:2px 0 4px;}
   .obj-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:12.5px;}
-  .obj-row .label{color:rgba(255,255,255,.55);}
-  .obj-row .value{color:#fff;font-weight:500;}
-  .obj-row.total{border-top:1px solid rgba(255,255,255,.16);margin-top:5px;padding-top:10px;font-size:14.5px;}
-  .obj-row.total .label, .obj-row.total .value{font-weight:700;color:#fff;}
+  .obj-row .label{color:rgba(var(--adm-fg-rgb),.55);}
+  .obj-row .value{color:var(--adm-fg);font-weight:500;}
+  .obj-row.total{border-top:1px solid rgba(var(--adm-fg-rgb),.16);margin-top:5px;padding-top:10px;font-size:14.5px;}
+  .obj-row.total .label, .obj-row.total .value{font-weight:700;color:var(--adm-fg);}
   .obj-mini{
     font-size:10.5px;padding:3px 9px;border-radius:6px;background:rgba(var(--adm-fg-rgb),.08);
     border:1px solid rgba(var(--adm-fg-rgb),.16);color:var(--adm-fg);cursor:pointer;white-space:nowrap;
@@ -632,8 +639,8 @@
   .obj-mini.primary:hover{background:#2a8bff;}
   .obj-mini.danger:hover{background:rgba(255,69,58,.25);border-color:rgba(255,69,58,.5);}
   .obj-mat-input{
-    width:100px;padding:5px 9px;border-radius:7px;border:1px solid rgba(255,255,255,.2);
-    background:rgba(255,255,255,.06);color:#fff;font-size:13px;text-align:right;
+    width:100px;padding:5px 9px;border-radius:7px;border:1px solid rgba(var(--adm-fg-rgb),.2);
+    background:rgba(var(--adm-fg-rgb),.06);color:var(--adm-fg);font-size:13px;text-align:right;
   }
   .obj-status-badge{font-size:11px;padding:3px 10px;border-radius:980px;font-weight:600;}
   .obj-status-badge.open{background:rgba(255,180,84,.16);color:#ffb454;}
@@ -1095,6 +1102,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 (function(){
 
@@ -1690,7 +1698,17 @@
     return wrap;
   }
   function updateAssembleProgress(wrap, progress){
-    const pieces = wrap.children;
+    // Das Basisfoto ist anfangs unsichtbar (weisser Hintergrund) und blendet sich mit
+    // dem Scroll-Fortschritt EIN STÜCK — als durchgehendes Bild, nicht als Mosaik, also
+    // ohne die weissen Fugen, die einzelne Kachel-Rechtecke verursachen würden. Dadurch
+    // ist das Foto beim ersten Erscheinen nie schon "fertig", sondern baut sich sichtbar
+    // zusammen mit den einfliegenden Bauteilen auf.
+    const img = wrap.querySelector('img[data-assemble="1"]');
+    if(img){
+      const photoEase = 1 - Math.pow(1-progress, 2);
+      img.style.opacity = photoEase;
+    }
+    const pieces = wrap.querySelectorAll('.assemble-piece');
     for(let i=0;i<pieces.length;i++){
       const p = pieces[i];
       const delay = parseFloat(p.dataset.delay);
@@ -1703,11 +1721,10 @@
       const dy = parseFloat(p.dataset.dy) * (1-ease);
       const rot = parseFloat(p.dataset.rot) * (1-ease);
       p.style.transform = `translate(${dx}px,${dy}px) rotate(${rot}deg)`;
-      // Das Basisfoto ist unsichtbar (siehe CSS) — der Hintergrund ist weiss. Jedes Teil
-      // fliegt von aussen ein und bleibt, sobald es seinen Platz erreicht hat, dauerhaft
-      // sichtbar (kein Auflösen mehr). Dadurch baut sich das Foto beim Herunterscrollen
-      // Stück für Stück wirklich auf, statt von Anfang an schon vollständig dazuliegen.
-      p.style.opacity = local < 0.05 ? 0 : ease;
+      // Die Teile sind eine zusätzliche, sichtbar aufbauende Ebene: gut sichtbar, während
+      // sie noch unterwegs sind, und lösen sich auf, sobald sie ihren Platz erreicht haben
+      // — das darunter mitwachsende Foto ist dann an dieser Stelle schon fast so weit.
+      p.style.opacity = local < 0.05 ? 0 : Math.max(0, 1 - Math.pow(ease, 2.2));
     }
   }
   function initAssembleEffects(){
@@ -1726,11 +1743,11 @@
       const vh = window.innerHeight;
       items.forEach(({wrap})=>{
         const rect = wrap.getBoundingClientRect();
-        // Fortschritt 0 (Bild noch unten, ausserhalb) → 1 (Bild hat die Bildschirmmitte erreicht)
-        // Beginnt, sobald das Bild von unten ins Blickfeld kommt, und braucht dann
-        // rund die 1.6-fache Fensterhöhe an Scrollstrecke, bis es komplett zusammengesetzt
-        // ist — dadurch bleibt der Effekt beim Scrollen gut sichtbar, statt sofort fertig zu sein.
-        const raw = (vh - rect.top) / (vh*1.05);
+        // Fortschritt 0 (Bild noch unten, ausserhalb) → 1 (fertig zusammengesetzt).
+        // Beginnt, sobald das Bild von unten ins Blickfeld kommt, und ist spätestens
+        // dann komplett zusammengesetzt, wenn die Kachel die Bildschirmmitte erreicht —
+        // nicht erst danach.
+        const raw = (vh - rect.top) / (vh*0.6);
         const progress = Math.max(0, Math.min(1, raw));
         updateAssembleProgress(wrap, progress);
       });
@@ -2277,6 +2294,9 @@
     email: 'U.F@Froh-HT.ch',
     requestEmail: 'info@Froh-Tech.ch',
     uid: 'CHE-123.456.789 MWST',
+    iban: '',              // Bankverbindung für die QR-Rechnung, z.B. CH93 0076 2011 6238 5295 7
+    bankName: '',          // z.B. "PostFinance" oder Bankname — rein informativ, nicht Teil des QR-Codes
+    accountHolder: '',     // Konto lautend auf — falls leer, wird der Firmenname verwendet
     paymentTermDays: 30,   // Zahlungsfrist in Tagen
     wochenstunden: 42,     // Soll-Arbeitsstunden pro Woche, für die Überzeit-Berechnung der Monteure
     skontoPercent: 0,      // Skonto in % (0 = kein Skonto)
@@ -3001,7 +3021,7 @@
   burger.addEventListener('click', ()=>{
     const links = $('.nav-links');
     links.style.display = (links.style.display==='flex') ? 'none' : 'flex';
-    links.style.cssText += 'position:absolute;top:64px;left:0;right:0;background:#fff;flex-direction:column;padding:20px 28px;border-bottom:1px solid #eee;';
+    links.style.cssText += 'position:absolute;top:84px;left:0;right:0;background:#fff;flex-direction:column;padding:20px 28px;border-bottom:1px solid #eee;';
   });
   $all('.nav-dropdown > a').forEach(trigger=>{
     trigger.addEventListener('click', (ev)=>{
@@ -6295,6 +6315,16 @@
         </div>
         <div class="admin-field"><label>Logo hochladen</label><input type="file" id="set-logo" accept="image/*"></div>
         <button class="btn btn-primary btn-sm" id="save-settings-btn">Einstellungen speichern</button>
+      </div>
+      <div class="settings-section-label">Bankverbindung (für QR-Rechnung)</div>
+      <div class="admin-card">
+        <p class="admin-settings-hint" style="margin-top:0;">Diese Angaben erzeugen automatisch einen scanbaren Schweizer QR-Code auf jeder Rechnung und Mahnung.</p>
+        <div class="admin-grid2">
+          <div class="admin-field"><label>IBAN</label><input type="text" id="set-iban" placeholder="CH93 0076 2011 6238 5295 7" value="${SETTINGS.iban}"></div>
+          <div class="admin-field"><label>Bank (optional, nur Anzeige)</label><input type="text" id="set-bank" placeholder="z.B. PostFinance" value="${SETTINGS.bankName}"></div>
+          <div class="admin-field"><label>Konto lautend auf</label><input type="text" id="set-accountholder" placeholder="${SETTINGS.name} (leer = Firmenname)" value="${SETTINGS.accountHolder}"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="save-bank-btn">Bankverbindung speichern</button>
       </div>`;
     }
 
@@ -6548,6 +6578,14 @@
       fsSaveSettings();
       recompute();
       alert(fsReady ? 'Einstellungen gespeichert und live synchronisiert.' : 'Einstellungen gespeichert (nur für diese Sitzung/Vorführung — keine Firebase-Verbindung).');
+    });
+    const bankBtn = $('#save-bank-btn');
+    if(bankBtn) bankBtn.addEventListener('click', ()=>{
+      SETTINGS.iban = $('#set-iban').value.trim();
+      SETTINGS.bankName = $('#set-bank').value.trim();
+      SETTINGS.accountHolder = $('#set-accountholder').value.trim();
+      fsSaveSettings();
+      alert(fsReady ? 'Bankverbindung gespeichert und live synchronisiert.' : 'Bankverbindung gespeichert (nur für diese Sitzung/Vorführung — keine Firebase-Verbindung).');
     });
     const paymentBtn = $('#save-payment-terms-btn');
     if(paymentBtn) paymentBtn.addEventListener('click', ()=>{
@@ -6952,6 +6990,60 @@
     showAdminEmailPreview(o, g, 'declined', gkey);
   }
 
+  /* ---------- Schweizer QR-Rechnung (SPC-Zahlteil) ---------- */
+  function normalizeIban(iban){ return (iban||'').replace(/\s+/g,'').toUpperCase(); }
+  function formatIban(iban){ return normalizeIban(iban).replace(/(.{4})/g,'$1 ').trim(); }
+  // Baut den offiziellen "Swiss Payment Standards"-Datenstring (SPC, Version 0200) für den Zahlteil-QR-Code.
+  // Referenztyp ist immer "NON" (kein strukturierter QR-Referenz-Verfahren, da hierfür eine spezielle
+  // QR-IBAN nötig wäre) — die Rechnungsnummer steht stattdessen im unstrukturierten Meldungstext.
+  function buildSwissQrPayload(amount, message){
+    const iban = normalizeIban(SETTINGS.iban);
+    if(!iban) return null;
+    const holder = (SETTINGS.accountHolder || SETTINGS.name || '').slice(0,70);
+    const amt = (typeof amount==='number' && amount>0) ? amount.toFixed(2) : '';
+    const msg = (message||'').slice(0,140);
+    const lines = [
+      'SPC','0200','1',
+      iban,
+      'K', holder, (SETTINGS.street||'').slice(0,70), (SETTINGS.city||'').slice(0,70), '', '', 'CH',
+      '', '', '', '', '', '', '',
+      amt, 'CHF',
+      '', '', '', '', '', '', '',
+      'NON', '',
+      msg,
+      'EPD'
+    ];
+    return lines.join('\r\n');
+  }
+  function generateQrDataUrl(text, size){
+    if(!text || typeof QRCode === 'undefined') return null;
+    try{
+      const holder = document.createElement('div');
+      new QRCode(holder, { text: text, width: size||300, height: size||300, correctLevel: QRCode.CorrectLevel.M });
+      const canvas = holder.querySelector('canvas');
+      if(canvas) return canvas.toDataURL('image/png');
+      const img = holder.querySelector('img');
+      if(img) return img.src;
+    }catch(e){ console.warn('QR-Code konnte nicht erzeugt werden', e); }
+    return null;
+  }
+  // Baut den "Zahlungsinformationen"-Block (IBAN + scanbarer QR-Code) fürs Rechnungs-PDF.
+  // Gibt bewusst nichts zurück, solange keine IBAN hinterlegt ist (Einstellungen → Firma).
+  function paymentInfoHtml(amount, message){
+    if(!SETTINGS.iban) return '';
+    const payload = buildSwissQrPayload(amount, message);
+    const qr = payload ? generateQrDataUrl(payload, 300) : null;
+    const holder = SETTINGS.accountHolder || SETTINGS.name;
+    return `
+      <div class="payment-info">
+        <div class="pi-text">
+          <div class="pi-title">Zahlungsinformationen</div>
+          <div class="pi-iban">${formatIban(SETTINGS.iban)}</div>
+          <div>${holder}${SETTINGS.bankName?` · ${SETTINGS.bankName}`:''}</div>
+        </div>
+        ${qr?`<div class="pi-qr"><img src="${qr}" alt="QR-Code für Zahlung"><div class="pi-qr-cap">Mit der Banking-App scannen</div></div>`:''}
+      </div>`;
+  }
   function buildInvoiceHtml(inv){
     let custName, custAddress, rangeLabel, rows, totalNetto;
     if(inv.gkey){
@@ -7015,6 +7107,7 @@
         <table class="offer-table"><thead><tr><th>Position</th><th class="num">Betrag</th></tr></thead><tbody>${rows}</tbody></table>
         <div class="offer-totals">${totalsHtml}</div>
         <div class="offer-period">${paymentTermsText()}</div>
+        ${paymentInfoHtml(brutto, `${invoiceKindLabel(inv)} ${inv.id}`)}
         <div class="offer-footer">${SETTINGS.name} · ${SETTINGS.street} · ${SETTINGS.city} · ${SETTINGS.uid}<br>Cc bei Versand: ${SETTINGS.requestEmail}</div>
       </div>`;
   }
@@ -7044,6 +7137,7 @@
           <tbody><tr><td>${inv.id} vom ${fmtHumanLong(inv.sentDate)}, fällig ${fmtHumanLong(inv.dueDate)}</td><td class="num">${chf(brutto)}</td></tr></tbody>
         </table>
         <div class="offer-period">Wir bitten um Ausgleich innert 10 Tagen ab Erhalt dieser Erinnerung.</div>
+        ${paymentInfoHtml(brutto, `Zahlungserinnerung ${inv.id}`)}
         <div class="offer-footer">${SETTINGS.name} · ${SETTINGS.street} · ${SETTINGS.city} · ${SETTINGS.uid}</div>
       </div>`;
   }
