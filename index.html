@@ -1812,12 +1812,10 @@
       // letzten Besuch weiter anzeigen, statt kurz auf das Standardbild zu wechseln.
       hero.style.backgroundImage = `url('${cached}')`;
       heroPhotoLocked = true;
-    } else if(!heroPhotoLocked){
-      hero.style.backgroundImage = `url('${hero.dataset.heroDefault}')`;
     }
-    // wenn heroPhotoLocked bereits true ist und SETTINGS.heroPhoto (z. B. durch einen
-    // kurzen Zwischenzustand beim Laden) leer wird, bleibt bewusst das zuletzt gesetzte
-    // echte Foto stehen — das Bild darf nie mehr auf das Standardbild zurückspringen.
+    // Es gibt bewusst KEIN eingebautes Standard-/Platzhalterfoto mehr — solange weder
+    // Firestore-Daten noch ein lokaler Zwischenspeicher vorhanden sind, bleibt der
+    // Hintergrund ein neutraler Farbverlauf (siehe CSS), niemals ein altes Bild.
   }
   function fsSaveCode(code){
     if(!fsReady) return;
@@ -3019,7 +3017,7 @@
     {email:'rf@froh-tech.ch', name:'Roland F.'},
     {email:'cs@froh-tech.ch', name:'Claudio S.'},
   ];
-  const SEED_PASSWORD = '1234';
+  const SEED_PASSWORD = 'FrohTech2026!'; // erfüllt auch strengere Passwort-Richtlinien (Grossbuchstabe, Kleinbuchstaben, Zahl, Sonderzeichen, 13 Zeichen) — "1234" und auch "123456" wurden von Firebase als zu schwach abgelehnt (auth/weak-password)
   const adminUsers = {}; // email(klein) -> {email, name, role:'admin'|'mitarbeiter'|'pending', mustChangePassword, createdAt, approvedBy}
   let authUser = null;   // aktuell angemeldeter Firebase-Auth-Benutzer (oder null)
   let seedAdminsDone = false;
@@ -3060,7 +3058,7 @@
             fsSaveAdminUser(u);
           }
         } else {
-          log(`${email}: FEHLER — ${e.code||e.message}.`);
+          log(`${email}: FEHLER — ${e.code||''} ${e.message||''}`.trim()+'.');
         }
       }
     }
