@@ -583,10 +583,14 @@
   /* Sitzungen — kompaktere, dichtere Darstellung statt der grosszügigen Standard-Abstände */
   .sitzung-compact .admin-card{padding:10px 14px;margin-bottom:7px;}
   .sitzung-compact .admin-field{margin-bottom:8px;}
-  .sitzung-compact textarea.sitzung-item-text{min-height:38px;font-size:13.5px;padding:8px 11px;}
-  .sitzung-compact textarea#sitzung-new-text{min-height:38px;font-size:13.5px;padding:8px 11px;}
+  .sitzung-compact textarea.sitzung-item-text{min-height:32px;font-size:13px;padding:6px 10px;line-height:1.35;}
+  .sitzung-compact textarea#sitzung-new-text{min-height:32px;font-size:13px;padding:6px 10px;}
+  .sitzung-compact textarea.sitzung-aufgabe-note{min-height:30px;font-size:12.5px;padding:6px 9px;line-height:1.3;}
+  .sitzung-compact select{padding:4px 7px;font-size:12px;border-radius:7px;}
+  .sitzung-compact .obj-mini{padding:4px 9px;font-size:11px;}
+  .sitzung-compact .admin-badge{padding:2px 7px;font-size:10.5px;}
   .sitzung-compact .admin-row{gap:10px;}
-  .sitzung-compact .folder-list{gap:6px;}
+  .sitzung-compact .folder-list{gap:5px;}
   /* Statistik — etwas mehr Tiefe/Politur für Charts und Kennzahl-Karten */
   .stat-chart-card{box-shadow:0 1px 4px rgba(0,0,0,.05);}
   .stat-chart-card svg text{font-family:inherit;}
@@ -948,7 +952,7 @@
               </div>
               <div class="checkline">
                 <input type="checkbox" id="gis-sanitaer">
-                <label for="gis-sanitaer" data-i18n="planner.sanitaerInkl">Sanitäranschluss inklusive (nur möglich bei vorverrohrten Elementen), CHF 450 pro Element</label>
+                <label for="gis-sanitaer" id="gis-sanitaer-label">Sanitäranschluss inklusive (nur möglich bei vorverrohrten Elementen), CHF 350 pro Element</label>
               </div>
             </div>
           </div>
@@ -1079,12 +1083,22 @@
       <div class="service-card-body">
         <div class="row2" style="align-items:start;">
           <div>
-            <div class="apparat-row"><span data-i18n="planner.wc">WC</span><div class="stepper" data-apparat="wc"><button data-dir="-1">–</button><span>0</span><button data-dir="1">+</button></div></div>
-            <div class="apparat-row"><span data-i18n="planner.wt">Waschtisch (WT)</span><div class="stepper" data-apparat="wt"><button data-dir="-1">–</button><span>0</span><button data-dir="1">+</button></div></div>
-            <div class="apparat-row"><span data-i18n="planner.du">Dusche (DU)</span><div class="stepper" data-apparat="du"><button data-dir="-1">–</button><span>0</span><button data-dir="1">+</button></div></div>
-            <div class="apparat-row"><span data-i18n="planner.bw">Badewanne (BW)</span><div class="stepper" data-apparat="bw"><button data-dir="-1">–</button><span>0</span><button data-dir="1">+</button></div></div>
-            <div class="apparat-row"><span data-i18n="planner.nische">Nische</span><div class="stepper" data-apparat="nische"><button data-dir="-1">–</button><span>0</span><button data-dir="1">+</button></div></div>
-            <p class="hint" data-i18n="planner.duofixHint">CHF 230 pro Apparat, reine Montage exklusive Material (inkl. Schrauben). Für ein Angebot inklusive Material kontaktieren Sie uns direkt.</p>
+            <div id="duofix-apparate-rows"></div>
+            <p class="hint" id="duofix-hint">Reine Montage exklusive Material (inkl. Schrauben). Für ein Angebot inklusive Material kontaktieren Sie uns direkt.</p>
+            <div class="row2" style="margin-top:14px;">
+              <div class="field">
+                <label for="leere-vorwand-m2">Leere Vorwand — m² (ohne vorverrohrte Elemente)</label>
+                <input type="number" id="leere-vorwand-m2" min="0" step="0.5" value="0">
+              </div>
+              <div class="field">
+                <label for="leere-trennwand-m2">Leere Trennwand — m² (ohne vorverrohrte Elemente)</label>
+                <input type="number" id="leere-trennwand-m2" min="0" step="0.5" value="0">
+              </div>
+            </div>
+            <div class="field" style="margin-top:14px;">
+              <label for="duofix-zusatz-hoelzer" id="duofix-hoelzer-label">Zusätzliche Holzeinlagen (3 pro Apparat inklusive, jedes weitere CHF 25.00)</label>
+              <input type="number" id="duofix-zusatz-hoelzer" min="0" value="0">
+            </div>
           </div>
           <div id="duofix-summary"></div>
         </div>
@@ -3579,7 +3593,6 @@ var qrcode = function() {
     'planner.vorwandLabel': {fr:'Éléments préfabriqués', it:'Elementi prefabbricati'},
     'planner.trennwandLabel': {fr:'Cloisons', it:'Pareti divisorie'},
     'planner.uebergroesse': {fr:'Hors format (>3 m de haut ou >3.5 m de large)', it:'Fuori misura (>3 m alto o >3.5 m largo)'},
-    'planner.sanitaerInkl': {fr:'Raccordement sanitaire inclus (possible uniquement pour éléments pré-tuyautés), CHF 450 par élément', it:'Allacciamento sanitario incluso (possibile solo per elementi pretubati), CHF 450 per elemento'},
     'planner.beplankungMeta': {fr:'GKPI · Aquapanel · Diamant', it:'GKPI · Aquapanel · Diamant'},
     'planner.flaeche': {fr:'Surface (m²)', it:'Superficie (m²)'},
     'planner.flaechePlaceholder': {fr:'p. ex. surface des éléments montés', it:'es. superficie degli elementi montati'},
@@ -3688,10 +3701,18 @@ var qrcode = function() {
       if(lang!=='de' && LEISTUNGEN_I18N_MAP[k] && text===LEISTUNGEN_I18N_MAP[k].de){
         text = LEISTUNGEN_I18N_MAP[k][lang] || text;
       }
-      const included = activeKeys.includes(k);
+      // Manuelle Übersteuerung (Einstellungen → Offerten-Texte) hat Vorrang vor der automatischen
+      // Erkennung anhand der tatsächlich gewählten Leistungen.
+      const override = SETTINGS.leistungenOverride && SETTINGS.leistungenOverride[k];
+      const included = override==='inkl' ? true : override==='exkl' ? false : activeKeys.includes(k);
       return `${included?'<strong>'+inklTxt+'</strong>':exklTxt} ${text}`;
     }).filter(Boolean);
-    (SETTINGS.extraLeistungen||[]).forEach(t=>{ if(t) lines.push(`<strong>${inklTxt}</strong> ${t}`); });
+    (SETTINGS.extraLeistungen||[]).forEach(raw=>{
+      const t = typeof raw==='string' ? {text:raw, status:'inkl'} : raw;
+      if(!t || !t.text) return;
+      const isInkl = (t.status||'inkl')!=='exkl';
+      lines.push(`${isInkl?'<strong>'+inklTxt+'</strong>':exklTxt} ${t.text}`);
+    });
     return lines.join('<br>');
   }
   const dateKey = d => { const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; };
@@ -3733,7 +3754,19 @@ var qrcode = function() {
     },
     ausflockungProM3: 150, ausflockungPauschale: 150, ausflockungRate: 15,
     silentpanelsRate: 200,
-    duofixProApparat: 230,
+    duofixProApparat: 230, // Alt-Feld, dient nur noch als Vorschlagspreis für neue Zeilen unten
+    duofixApparate: [      // Frei konfigurierbare Duofix-Apparate mit je eigenem Preis (Einstellungen → Preise & Kalkulation)
+      {key:'wc', label:'WC', price:230},
+      {key:'wt', label:'Waschtisch (WT)', price:230},
+      {key:'du', label:'Dusche (DU)', price:230},
+      {key:'bw', label:'Badewanne (BW)', price:230},
+      {key:'nische', label:'Nische', price:230},
+    ],
+    // m²-basierte Option "Leere Vorwand/Trennwand" beim Duofix — separat von den stückzahlbasierten
+    // Apparaten (Einstellungen → Preise & Kalkulation).
+    leereWandProM2: 180,
+    holzInklProApparat: 3,  // Anzahl Holzeinlagen, die pro Duofix-Apparat inklusive sind
+    holzProStueck: 25,      // CHF pro zusätzlicher Holzeinlage über das Inklusiv-Kontingent hinaus
     monteurEK: 45,     // Eigenkosten pro Stunde eigener Monteur (Kalkulation Marge)
     anfahrtProTag: 100, // Anfahrtskosten pro Arbeitstag bei GIS-Montage (>=3 Elemente)
     vvgkPercent: 8.5,  // Verwaltungs-/Vertriebsgemeinkosten, % der Auftragssumme
@@ -4220,6 +4253,12 @@ var qrcode = function() {
     update();
   }
 
+  // Setzt den (in Einstellungen editierbaren) Sanitäranschluss-Text mit dem aktuellen Preis ein —
+  // verhindert, dass Text und tatsächlicher Preis auseinanderlaufen (war zuvor fest im HTML verdrahtet).
+  function applySanitaerInklText(){
+    const label = document.getElementById('gis-sanitaer-label');
+    if(label) label.textContent = (SETTINGS.sanitaerInklText||'').replace('{preis}', chf(PRICES.sanitaerProElement).replace('CHF ',''));
+  }
   function applySectionVisibility(){
     // SETTINGS.showOrganigramm / SETTINGS.showTeam: undefined/true = sichtbar (Standard),
     // false = Sektion (und der zugehörige Nav-Link) komplett ausgeblendet.
@@ -4669,6 +4708,9 @@ var qrcode = function() {
         renderOverviewGrid();
         recompute();
         applySectionVisibility();
+        applySanitaerInklText();
+        renderDuofixApparateRows();
+        applyDuofixHoelzerLabel();
         refreshAdmin();
       }
     }, e=>console.warn('settings listener', e));
@@ -4796,18 +4838,43 @@ var qrcode = function() {
     return {tage, lines:[{label:`SilentPanels × ${qty} Stk. (${tage} Arbeitstag${tage>1?'e':''} à Team-Tagespauschale)`, amount:amt}], grand:amt};
   }
 
+  function applyDuofixHoelzerLabel(){
+    const label = document.getElementById('duofix-hoelzer-label');
+    if(label) label.textContent = `Zusätzliche Holzeinlagen (${PRICES.holzInklProApparat} pro Apparat inklusive, jedes weitere ${chf(PRICES.holzProStueck)})`;
+  }
+  function renderDuofixApparateRows(){
+    const wrap = document.getElementById('duofix-apparate-rows');
+    if(!wrap) return;
+    const prevCounts = duofixCounts();
+    wrap.innerHTML = (PRICES.duofixApparate||[]).map(a=>`
+      <div class="apparat-row"><span>${a.label} <span style="opacity:.55;font-size:12px;">(CHF ${a.price}/Stk.)</span></span><div class="stepper" data-apparat="${a.key}"><button data-dir="-1">–</button><span>${prevCounts[a.key]||0}</span><button data-dir="1">+</button></div></div>`
+    ).join('');
+  }
   function duofixCounts(){
     const out={};
-    $all('.stepper').forEach(s=>{ out[s.dataset.apparat] = parseInt(s.querySelector('span').textContent)||0; });
+    $all('#duofix-apparate-rows .stepper').forEach(s=>{ out[s.dataset.apparat] = parseInt(s.querySelector('span').textContent)||0; });
     return out;
   }
   function computeDuofix(){
     const c = duofixCounts();
-    const total = Object.values(c).reduce((a,b)=>a+b,0);
-    if(total<=0) return null;
-    const labelMap = {wc:'WC', wt:'Waschtisch', du:'Dusche', bw:'Badewanne', nische:'Nische'};
-    const lines = Object.keys(c).filter(k=>c[k]>0).map(k=>({label:`${labelMap[k]} × ${c[k]}`, amount:c[k]*PRICES.duofixProApparat}));
-    return {tage:0, lines, grand: total*PRICES.duofixProApparat};
+    const totalApparate = Object.values(c).reduce((a,b)=>a+b,0);
+    const leereVorwandM2 = parseFloat($('#leere-vorwand-m2').value)||0;
+    const leereTrennwandM2 = parseFloat($('#leere-trennwand-m2').value)||0;
+    const zusatzHoelzerEingegeben = parseInt($('#duofix-zusatz-hoelzer').value)||0;
+    if(totalApparate<=0 && leereVorwandM2<=0 && leereTrennwandM2<=0 && zusatzHoelzerEingegeben<=0) return null;
+    const rows = PRICES.duofixApparate||[];
+    const lines = rows.filter(a=>c[a.key]>0).map(a=>({label:`${a.label} × ${c[a.key]}`, amount:c[a.key]*a.price}));
+    let grand = rows.reduce((sum,a)=> sum + (c[a.key]||0)*a.price, 0);
+    if(leereVorwandM2>0){ const amt=Math.round(leereVorwandM2*PRICES.leereWandProM2*100)/100; lines.push({label:`Leere Vorwand × ${leereVorwandM2} m²`, amount:amt}); grand+=amt; }
+    if(leereTrennwandM2>0){ const amt=Math.round(leereTrennwandM2*PRICES.leereWandProM2*100)/100; lines.push({label:`Leere Trennwand × ${leereTrennwandM2} m²`, amount:amt}); grand+=amt; }
+    // 3 Holzeinlagen pro Apparat sind inklusive — nur Hölzer darüber hinaus werden verrechnet
+    const holzInklusive = totalApparate * PRICES.holzInklProApparat;
+    const holzZuVerrechnen = Math.max(0, zusatzHoelzerEingegeben - holzInklusive);
+    if(zusatzHoelzerEingegeben>0){
+      lines.push({label:`Holzeinlagen × ${zusatzHoelzerEingegeben} (${Math.min(zusatzHoelzerEingegeben,holzInklusive)} inkl., ${holzZuVerrechnen} zusätzlich à ${chf(PRICES.holzProStueck)})`, amount: holzZuVerrechnen*PRICES.holzProStueck});
+      grand += holzZuVerrechnen*PRICES.holzProStueck;
+    }
+    return {tage:0, lines, grand};
   }
 
   let MWST_RATE = 0.081;
@@ -4835,6 +4902,8 @@ var qrcode = function() {
       duofix: 'Duofix-Montage',
     },
     extraLeistungen: [], // Zusätzliche, frei editierbare Inkl.-Positionen ohne eigene Preisberechnung (Einstellungen → Offerten-Texte)
+    leistungenOverride: {}, // {montage:'inkl'|'exkl'|undefined, ...} — erzwingt Inkl./Exkl. unabhängig von der Auswahl; undefined = automatisch (Einstellungen → Offerten-Texte)
+    sanitaerInklText: 'Sanitäranschluss inklusive (nur möglich bei vorverrohrten Elementen), CHF {preis} pro Element', // {preis} wird live durch PRICES.sanitaerProElement ersetzt — Einstellungen → Preise & Kalkulation
     dayCapacity: { montage: 30, beplankung: 70 }, // Elemente bzw. m² pro Arbeitstag, ab der ein Tag im Webkalender als "besetzt" gilt
     lohnAbzuege: {          // Standard-Sozialabzüge in % vom Bruttolohn, gelten für alle Mitarbeiter (Einstellungen → Team & Monteure)
       ahvPercent: 5.3,      // AHV/IV/EO
@@ -5559,15 +5628,15 @@ var qrcode = function() {
     window.location.href = `mailto:${SETTINGS.email}?subject=${subject}&body=${body}`;
   }
 
-  $all('#card-duofix .stepper button').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const wrap = btn.closest('.stepper');
-      const span = wrap.querySelector('span');
-      let v = parseInt(span.textContent)||0;
-      v = Math.max(0, v + parseInt(btn.dataset.dir));
-      span.textContent = v;
-      renderDuofixSummary();
-    });
+  if(duofixCard) duofixCard.addEventListener('click', (ev)=>{
+    const btn = ev.target.closest('.stepper button');
+    if(!btn || !duofixCard.contains(btn)) return;
+    const wrap = btn.closest('.stepper');
+    const span = wrap.querySelector('span');
+    let v = parseInt(span.textContent)||0;
+    v = Math.max(0, v + parseInt(btn.dataset.dir));
+    span.textContent = v;
+    renderDuofixSummary();
   });
 
   /* mobile nav (simple toggle for burger, not critical for demo) */
@@ -6859,6 +6928,29 @@ var qrcode = function() {
         </div>
       </div>
 
+      <div class="settings-section-label" style="margin-top:0;">🔁 Abos — wiederkehrender Umsatz</div>
+      <div class="admin-grid2" style="margin-bottom:22px;">
+        ${(()=>{
+          const activeAbos = abos.filter(a=>a.active);
+          const mrr = activeAbos.reduce((sum,a)=>{
+            const monthlyEquiv = a.interval==='monatlich' ? a.amount : a.interval==='vierteljaehrlich' ? a.amount/3 : a.amount/12;
+            return sum + monthlyEquiv;
+          }, 0);
+          const dueNow = abos.filter(a=>a.active && a.nextInvoiceDate<=today).length;
+          return `
+          <div class="admin-card" style="text-align:center;">
+            <div class="folder-meta" style="text-transform:uppercase;letter-spacing:.04em;">Monatlicher Umsatz aus Abos (MRR)</div>
+            <div style="font-size:26px;font-weight:700;color:var(--adm-fg);margin:6px 0;">${chf(Math.round(mrr*100)/100)}</div>
+            <div class="folder-meta">${activeAbos.length} aktive Abo${activeAbos.length!==1?'s':''} · hochgerechnet ${chf(Math.round(mrr*12*100)/100)}/Jahr</div>
+          </div>
+          <div class="admin-card" style="text-align:center;">
+            <div class="folder-meta" style="text-transform:uppercase;letter-spacing:.04em;">Aktuell fällige Abo-Rechnungen</div>
+            <div style="font-size:26px;font-weight:700;color:${dueNow>0?'#dc3545':'var(--adm-fg)'};margin:6px 0;">${dueNow}</div>
+            <div class="folder-meta"><a href="#" class="controlling-goto-auftraege-link" style="color:#0a7cff;">→ In Aufträge ansehen und abhaken</a></div>
+          </div>`;
+        })()}
+      </div>
+
       <div class="settings-section-label" style="margin-top:0;">Auswertung &amp; Vergleich nach Zeitraum</div>
       <div class="admin-card" style="margin-bottom:22px;">
         <div class="admin-grid2" style="margin-bottom:10px;">
@@ -7240,6 +7332,23 @@ var qrcode = function() {
             return rows.length ? rows.map(r=>`<tr><td>${r.supplier}</td><td class="num">${r.count}</td><td class="num">${chf(Math.round(r.total*100)/100)}</td><td class="num">${chf(Math.round(r.offen*100)/100)}</td></tr>`).join('') : '<tr><td colspan="4">Keine Kreditoren im Zeitraum.</td></tr>';
           })()}</tbody>
         </table>
+
+        <div class="settings-section-label" style="margin-top:24px;">Abos — wiederkehrender Umsatz (aktueller Stand, nicht zeitraumgefiltert)</div>
+        <table class="offer-table"><thead><tr><th>Kunde</th><th>Produkt</th><th>Intervall</th><th class="num">Betrag/Periode</th></tr></thead>
+          <tbody>${(()=>{
+            const activeAbos = abos.filter(a=>a.active);
+            if(!activeAbos.length) return '<tr><td colspan="4">Keine aktiven Abos.</td></tr>';
+            return activeAbos.map(a=>`<tr><td>${a.customerName}</td><td>${a.product}</td><td>${a.interval}</td><td class="num">${chf(a.amount)}</td></tr>`).join('');
+          })()}</tbody>
+        </table>
+        ${(()=>{
+          const activeAbos = abos.filter(a=>a.active);
+          const mrr = activeAbos.reduce((sum,a)=>{
+            const monthlyEquiv = a.interval==='monatlich' ? a.amount : a.interval==='vierteljaehrlich' ? a.amount/3 : a.amount/12;
+            return sum + monthlyEquiv;
+          }, 0);
+          return `<p style="font-size:12px;color:#555;margin-top:6px;"><strong>Monatlicher Umsatz aus Abos (MRR): ${chf(Math.round(mrr*100)/100)}</strong> · hochgerechnet ${chf(Math.round(mrr*12*100)/100)}/Jahr · ${activeAbos.length} aktive Abo${activeAbos.length!==1?'s':''}</p>`;
+        })()}
 
         <div class="settings-section-label" style="margin-top:24px;">Umsatz &amp; Marge je Objekt (gesamter Bestand, nicht zeitraumgefiltert)</div>
         <table class="offer-table"><thead><tr><th>Objekt</th><th>Kunde</th><th class="num">Umsatz</th><th class="num">Marge</th><th class="num">Marge %</th></tr></thead>
@@ -9863,30 +9972,30 @@ var qrcode = function() {
         const noCount = Object.values(it.votes||{}).filter(v=>v==='nein').length;
         const myVote = currentAdminEmail && it.votes ? it.votes[currentAdminEmail] : null;
         return `
-        <div class="admin-card" data-item-id="${it.id}" style="padding:11px 15px;${it.type==='aufgabe'&&it.status!=='erledigt'?'border-color:rgba(255,159,10,.4);':''}">
+        <div class="admin-card" data-item-id="${it.id}" style="padding:9px 13px;${it.type==='aufgabe'&&it.status!=='erledigt'?'border-color:rgba(255,159,10,.4);':''}">
           <div class="admin-row" style="align-items:flex-start;">
             <div style="min-width:0;flex:1;">
-              ${editable ? `<textarea class="sitzung-item-text" data-item-id="${it.id}" rows="2" style="width:100%;margin-bottom:6px;">${it.text}</textarea>` : `<div style="font-size:14px;color:var(--adm-fg);margin-bottom:6px;">${it.text}</div>`}
-              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              ${editable ? `<textarea class="sitzung-item-text" data-item-id="${it.id}" rows="1" style="width:100%;margin-bottom:5px;">${it.text}</textarea>` : `<div style="font-size:13.5px;color:var(--adm-fg);margin-bottom:5px;">${it.text}</div>`}
+              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
                 <span class="admin-badge ${it.type==='abstimmung'?'akonto':it.type==='aufgabe'?'requested':'team'}">${it.type==='abstimmung'?'🗳 Abstimmung':it.type==='aufgabe'?'✅ Aufgabe':'📝 Info'}</span>
                 ${it.assignedName ? `<span class="folder-meta">👤 ${it.assignedName}</span>` : ''}
                 ${it.status==='erledigt' ? `<span class="admin-badge confirmed">✓ Erledigt</span>` : ''}
               </div>
-              ${it.resultText ? `<div style="margin-top:6px;font-size:13px;color:rgba(var(--adm-fg-rgb),.8);white-space:pre-wrap;">${it.resultText}</div>` : ''}
+              ${it.resultText ? `<div style="margin-top:5px;font-size:12.5px;color:rgba(var(--adm-fg-rgb),.8);white-space:pre-wrap;">${it.resultText}</div>` : ''}
               ${it.type==='abstimmung' ? `
-                <div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                   <span class="folder-meta">✓ Ja: ${yesCount} · ✕ Nein: ${noCount} (von ${admins.length} Admins)</span>
                   ${currentAdminEmail ? `
                     <button class="obj-mini ${myVote==='ja'?'primary':''} vote-btn" data-item-id="${it.id}" data-vote="ja">✓ Ja</button>
                     <button class="obj-mini ${myVote==='nein'?'primary':''} vote-btn" data-item-id="${it.id}" data-vote="nein">✕ Nein</button>` : ''}
                 </div>` : ''}
               ${it.type==='aufgabe' && it.status!=='erledigt' ? `
-                <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start;">
-                  <textarea class="sitzung-aufgabe-note" data-item-id="${it.id}" rows="2" placeholder="Vermerk (optional)" style="flex:1;min-width:180px;min-height:38px;"></textarea>
+                <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                  <textarea class="sitzung-aufgabe-note" data-item-id="${it.id}" rows="1" placeholder="Vermerk (optional)" style="flex:1;min-width:180px;"></textarea>
                   <button class="obj-mini primary sitzung-aufgabe-done" data-item-id="${it.id}">✓ Erledigt</button>
                 </div>` : ''}
               ${editable ? `
-                <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
                   <select class="sitzung-item-type" data-item-id="${it.id}">
                     <option value="normal" ${it.type==='normal'?'selected':''}>📝 Info</option>
                     <option value="aufgabe" ${it.type==='aufgabe'?'selected':''}>✅ Aufgabe</option>
@@ -10002,7 +10111,7 @@ var qrcode = function() {
           <div class="admin-field"><label>Firmenname</label><input type="text" id="set-name" value="${SETTINGS.name}"></div>
           <div class="admin-field"><label>Telefon</label><input type="text" id="set-phone" value="${SETTINGS.phone}"></div>
           <div class="admin-field"><label>Strasse</label><input type="text" id="set-street" value="${SETTINGS.street}"></div>
-          <div class="admin-field"><label>PLZ / Ort</label><input type="text" id="set-city" value="${SETTINGS.city}"></div>
+          <div class="admin-field"><label>PLZ / Ort</label><input type="text" id="set-city" placeholder="z.B. 8620 Wetzikon" value="${SETTINGS.city}"></div>
           <div class="admin-field"><label>E-Mail</label><input type="text" id="set-email" value="${SETTINGS.email}"></div>
           <div class="admin-field"><label>MWST-Nr.</label><input type="text" id="set-uid" value="${SETTINGS.uid}"></div>
           <div class="admin-field"><label>MWST-Satz (%)</label><input type="number" step="0.1" id="set-mwst" value="${(MWST_RATE*100).toFixed(1)}"></div>
@@ -10012,7 +10121,7 @@ var qrcode = function() {
       </div>
       <div class="settings-section-label">Bankverbindung (für QR-Rechnung)</div>
       <div class="admin-card">
-        <p class="admin-settings-hint" style="margin-top:0;">Diese Angaben erzeugen automatisch einen scanbaren Schweizer QR-Code auf jeder Rechnung und Mahnung.</p>
+        <p class="admin-settings-hint" style="margin-top:0;">Diese Angaben erzeugen automatisch einen scanbaren Schweizer QR-Code auf jeder Rechnung und Mahnung. Die Firmenadresse dafür wird automatisch aus den Angaben oben unter "Firma" übernommen (Strasse, PLZ/Ort) — hier musst du sie nicht nochmals eingeben.${(!SETTINGS.street || !/\d/.test(SETTINGS.city||''))?' <strong style="color:#f59e0b;">⚠️ Prüfe oben, ob Strasse und PLZ/Ort (inkl. Postleitzahl!) vollständig ausgefüllt sind — sonst ist der QR-Code unvollständig.</strong>':''}</p>
         <div class="admin-grid2">
           <div class="admin-field"><label>IBAN</label><input type="text" id="set-iban" placeholder="CH93 0076 2011 6238 5295 7" value="${SETTINGS.iban}"></div>
           <div class="admin-field"><label>Bank (optional, nur Anzeige)</label><input type="text" id="set-bank" placeholder="z.B. PostFinance" value="${SETTINGS.bankName}"></div>
@@ -10048,11 +10157,36 @@ var qrcode = function() {
           <div class="admin-field"><label>Anfahrtspauschale Kleinauftrag/Restarbeiten (CHF)</label><input type="number" id="price-anfahrt" value="${PRICES.anfahrtPauschale}"></div>
           <div class="admin-field"><label>Anfahrt pro Arbeitstag GIS-Montage (CHF)</label><input type="number" id="price-anfahrt-tag" value="${PRICES.anfahrtProTag}"></div>
           <div class="admin-field"><label>Ausflockung / m³ (CHF)</label><input type="number" id="price-ausflockung" value="${PRICES.ausflockungProM3}"></div>
-          <div class="admin-field"><label>Duofix / Apparat (CHF)</label><input type="number" id="price-duofix" value="${PRICES.duofixProApparat}"></div>
+          <div class="admin-field"><label>Duofix — Vorschlagspreis für neue Apparate (CHF)</label><input type="number" id="price-duofix" value="${PRICES.duofixProApparat}"></div>
           <div class="admin-field"><label>Beplankung-Kleinauftrag — Schwelle (m²)</label><input type="number" id="price-beplankung-klein-schwelle" value="${PRICES.beplankungKleinauftragSchwelle}"></div>
           <div class="admin-field"><label>Beplankung-Kleinauftrag — Pauschale (CHF)</label><input type="number" id="price-beplankung-klein-pauschale" value="${PRICES.beplankungKleinauftragPauschale}"></div>
+          <div class="admin-field"><label>Leere Vorwand/Trennwand — Preis pro m² (CHF)</label><input type="number" id="price-leere-wand" value="${PRICES.leereWandProM2}"></div>
+          <div class="admin-field"><label>Holzeinlagen inklusive pro Apparat (Stk.)</label><input type="number" id="price-holz-inkl" value="${PRICES.holzInklProApparat}"></div>
+          <div class="admin-field"><label>Zusätzliche Holzeinlage — Preis (CHF/Stk.)</label><input type="number" id="price-holz-stueck" value="${PRICES.holzProStueck}"></div>
         </div>
+        <div class="admin-field" style="margin-top:14px;"><label>Text "Sanitäranschluss inklusive" auf der Buchungsseite — <code>{preis}</code> wird automatisch durch den Preis oben ersetzt</label><input type="text" id="text-sanitaer-inkl" value="${(SETTINGS.sanitaerInklText||'').replace(/"/g,'&quot;')}"></div>
         <button class="btn btn-primary btn-sm" id="save-prices-btn">Preise speichern</button>
+      </div>
+      <div class="settings-section-label">Duofix-Apparate verwalten</div>
+      <div class="admin-card">
+        <p class="admin-settings-hint" style="margin-top:0;">Jeder Apparat hat einen eigenen Preis. Reihenfolge = Reihenfolge auf der Buchungsseite.</p>
+        <div id="duofix-apparate-admin-list">
+          ${(PRICES.duofixApparate||[]).map((a,i)=>`
+          <div class="admin-grid2" style="margin-bottom:10px;align-items:end;">
+            <div class="admin-field" style="margin-bottom:0;"><label>Bezeichnung</label><input type="text" class="duofix-apparat-label" data-idx="${i}" value="${a.label.replace(/"/g,'&quot;')}"></div>
+            <div class="admin-field" style="margin-bottom:0;"><label>Preis (CHF)</label><input type="number" class="duofix-apparat-price" data-idx="${i}" value="${a.price}"></div>
+            <button class="btn btn-ghost btn-sm" data-remove-duofix-apparat="${i}" style="color:var(--adm-fg);border-color:rgba(var(--adm-fg-rgb),.3);">Entfernen</button>
+          </div>`).join('') || '<div class="admin-empty" style="padding:6px 0;">Noch keine Apparate — unten hinzufügen.</div>'}
+        </div>
+        <button class="btn btn-primary btn-sm" id="save-duofix-apparate-btn" style="margin-top:6px;">Duofix-Apparate speichern</button>
+      </div>
+      <div class="settings-section-label">Neuer Duofix-Apparat</div>
+      <div class="admin-card">
+        <div class="admin-grid2">
+          <div class="admin-field" style="margin-bottom:0;"><label>Bezeichnung</label><input type="text" id="new-duofix-apparat-label" placeholder="z. B. Urinal"></div>
+          <div class="admin-field" style="margin-bottom:0;"><label>Preis (CHF)</label><input type="number" id="new-duofix-apparat-price" value="${PRICES.duofixProApparat}"></div>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="add-duofix-apparat-btn" style="margin-top:12px;">+ Hinzufügen</button>
       </div>
       <div class="settings-section-label">Kostenkalkulation (für Marge/Reingewinn)</div>
       <div class="admin-card">
@@ -10077,21 +10211,51 @@ var qrcode = function() {
     if(einstellungenCategory==='texte'){
       html += `
       <div class="settings-panel-title">📝 Offerten-Texte</div>
-      <p class="settings-panel-sub">Diese Texte erscheinen automatisch als "Inkl." oder "Exkl." auf Angebot/AB — je nachdem, was der Kunde online ausgewählt hat bzw. was du bei einer manuellen Offerte ankreuzt.</p>
+      <p class="settings-panel-sub">Diese Texte erscheinen automatisch als "Inkl." oder "Exkl." auf Angebot/AB — je nachdem, was der Kunde online ausgewählt hat bzw. was du bei einer manuellen Offerte ankreuzt. Mit "Immer Inkl./Exkl." kannst du das pro Leistung fest überschreiben.</p>
       <div class="admin-card">
-        ${LEISTUNGEN_ORDER.map(k=>`<div class="admin-field"><label>${k.charAt(0).toUpperCase()+k.slice(1)}</label><input type="text" class="leistung-text" data-key="${k}" value="${SETTINGS.leistungen[k]}"></div>`).join('')}
+        ${LEISTUNGEN_ORDER.map(k=>{
+          const ov = (SETTINGS.leistungenOverride||{})[k] || 'auto';
+          return `<div class="admin-grid2" style="margin-bottom:10px;align-items:end;">
+            <div class="admin-field" style="margin-bottom:0;"><label>${k.charAt(0).toUpperCase()+k.slice(1)}</label><input type="text" class="leistung-text" data-key="${k}" value="${SETTINGS.leistungen[k]}"></div>
+            <div class="admin-field" style="margin-bottom:0;"><label>Anzeige</label>
+              <select class="leistung-override" data-key="${k}">
+                <option value="auto" ${ov==='auto'?'selected':''}>Automatisch (je nach Auswahl)</option>
+                <option value="inkl" ${ov==='inkl'?'selected':''}>Immer Inkl.</option>
+                <option value="exkl" ${ov==='exkl'?'selected':''}>Immer Exkl.</option>
+              </select>
+            </div>
+          </div>`;
+        }).join('')}
         <button class="btn btn-primary btn-sm" id="save-leistungen-btn">Inkl./Exkl.-Texte speichern</button>
       </div>
-      <div class="settings-section-label">Zusätzliche Inklusiv-Positionen</div>
-      <p class="settings-panel-sub" style="margin-top:-6px;">Frei hinzufügbare Zeilen ohne eigene Preisberechnung — erscheinen zusätzlich als "Inkl." auf jeder Offerte/jedem AB. Beliebig viele Zeilen hinzufügen oder entfernen.</p>
+      <div class="settings-section-label">Zusätzliche Positionen</div>
+      <p class="settings-panel-sub" style="margin-top:-6px;">Frei hinzufügbare Zeilen ohne eigene Preisberechnung — erscheinen zusätzlich auf jeder Offerte/jedem AB, mit dem hier gewählten Status. Beliebig viele Zeilen hinzufügen oder entfernen.</p>
       <div class="admin-card">
-        <div id="extra-leistungen-list">${(SETTINGS.extraLeistungen||[]).length ? SETTINGS.extraLeistungen.map((t,i)=>`
+        <div id="extra-leistungen-list">${(SETTINGS.extraLeistungen||[]).length ? SETTINGS.extraLeistungen.map((raw,i)=>{
+          const t = typeof raw==='string' ? {text:raw, status:'auto'} : raw;
+          const st = t.status || 'auto';
+          return `
           <div class="apparat-row" style="flex-wrap:wrap;gap:8px;">
-            <input type="text" class="extra-leistung-text" data-index="${i}" value="${t}" style="flex:1;min-width:220px;padding:8px 12px;border-radius:8px;border:1px solid rgba(var(--adm-fg-rgb),.16);background:rgba(var(--adm-fg-rgb),.06);color:var(--adm-fg);font-size:13px;">
+            <input type="text" class="extra-leistung-text" data-index="${i}" value="${(t.text||'').replace(/"/g,'&quot;')}" style="flex:1;min-width:220px;padding:8px 12px;border-radius:8px;border:1px solid rgba(var(--adm-fg-rgb),.16);background:rgba(var(--adm-fg-rgb),.06);color:var(--adm-fg);font-size:13px;">
+            <select class="extra-leistung-status" data-index="${i}" style="padding:8px 10px;border-radius:8px;border:1px solid rgba(var(--adm-fg-rgb),.16);background:rgba(var(--adm-fg-rgb),.06);color:var(--adm-fg);font-size:13px;">
+              <option value="auto" ${st==='auto'?'selected':''}>Automatisch (= Inkl.)</option>
+              <option value="inkl" ${st==='inkl'?'selected':''}>Immer Inkl.</option>
+              <option value="exkl" ${st==='exkl'?'selected':''}>Immer Exkl.</option>
+            </select>
             <button class="btn btn-ghost btn-sm" data-remove-extra-leistung="${i}" style="color:var(--adm-fg);border-color:rgba(var(--adm-fg-rgb),.3);">Entfernen</button>
-          </div>`).join('') : '<div class="admin-empty" style="padding:6px 0;">Noch keine zusätzlichen Positionen.</div>'}</div>
-        <div class="admin-field" style="margin-top:14px;"><label>Neue Position</label><input type="text" id="new-extra-leistung" placeholder="z. B. Entsorgung Bauabfälle"></div>
-        <div class="admin-actions">
+          </div>`;
+        }).join('') : '<div class="admin-empty" style="padding:6px 0;">Noch keine zusätzlichen Positionen.</div>'}</div>
+        <div class="admin-grid2" style="margin-top:14px;">
+          <div class="admin-field" style="margin-bottom:0;"><label>Neue Position</label><input type="text" id="new-extra-leistung" placeholder="z. B. Entsorgung Bauabfälle"></div>
+          <div class="admin-field" style="margin-bottom:0;"><label>Status</label>
+            <select id="new-extra-leistung-status">
+              <option value="auto">Automatisch (= Inkl.)</option>
+              <option value="inkl">Immer Inkl.</option>
+              <option value="exkl">Immer Exkl.</option>
+            </select>
+          </div>
+        </div>
+        <div class="admin-actions" style="margin-top:12px;">
           <button class="btn btn-secondary btn-sm" id="add-extra-leistung-btn">+ Zeile hinzufügen</button>
           <button class="btn btn-primary btn-sm" id="save-extra-leistungen-btn">Speichern</button>
         </div>
@@ -10250,12 +10414,14 @@ var qrcode = function() {
     if(toggleOrg) toggleOrg.addEventListener('change', ()=>{
       SETTINGS.showOrganigramm = toggleOrg.checked;
       applySectionVisibility();
+      applySanitaerInklText();
       fsSaveSettings();
     });
     const toggleTeam = $('#toggle-show-team');
     if(toggleTeam) toggleTeam.addEventListener('change', ()=>{
       SETTINGS.showTeam = toggleTeam.checked;
       applySectionVisibility();
+      applySanitaerInklText();
       fsSaveSettings();
     });
     const saveHeroPhotoBtn = $('#save-hero-photo-btn');
@@ -10411,9 +10577,50 @@ var qrcode = function() {
       PRICES.duofixProApparat = parseFloat($('#price-duofix').value)||PRICES.duofixProApparat;
       PRICES.beplankungKleinauftragSchwelle = parseFloat($('#price-beplankung-klein-schwelle').value)||PRICES.beplankungKleinauftragSchwelle;
       PRICES.beplankungKleinauftragPauschale = parseFloat($('#price-beplankung-klein-pauschale').value)||PRICES.beplankungKleinauftragPauschale;
+      PRICES.leereWandProM2 = parseFloat($('#price-leere-wand').value)||PRICES.leereWandProM2;
+      PRICES.holzInklProApparat = parseInt($('#price-holz-inkl').value);
+      if(isNaN(PRICES.holzInklProApparat)) PRICES.holzInklProApparat = 3;
+      PRICES.holzProStueck = parseFloat($('#price-holz-stueck').value)||PRICES.holzProStueck;
+      SETTINGS.sanitaerInklText = $('#text-sanitaer-inkl').value.trim() || SETTINGS.sanitaerInklText;
       fsSaveSettings();
       recompute();
+      applySanitaerInklText();
       alert(fsReady ? 'Preise gespeichert und live synchronisiert.' : 'Preise gespeichert (nur für diese Sitzung/Vorführung — keine Firebase-Verbindung).');
+    });
+    const saveDuofixApparateBtn = $('#save-duofix-apparate-btn');
+    if(saveDuofixApparateBtn) saveDuofixApparateBtn.addEventListener('click', ()=>{
+      $all('.duofix-apparat-label').forEach(inp=>{ const a = PRICES.duofixApparate[parseInt(inp.dataset.idx)]; if(a) a.label = inp.value.trim()||a.label; });
+      $all('.duofix-apparat-price').forEach(inp=>{ const a = PRICES.duofixApparate[parseInt(inp.dataset.idx)]; if(a) a.price = parseFloat(inp.value)||a.price; });
+      fsSaveSettings();
+      recompute();
+      renderDuofixApparateRows();
+      applyDuofixHoelzerLabel();
+      renderAdminBody();
+      alert(fsReady ? 'Duofix-Apparate gespeichert und live synchronisiert.' : 'Duofix-Apparate gespeichert (nur für diese Sitzung/Vorführung — keine Firebase-Verbindung).');
+    });
+    $all('[data-remove-duofix-apparat]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const idx = parseInt(btn.dataset.removeDuofixApparat);
+        PRICES.duofixApparate.splice(idx,1);
+        fsSaveSettings();
+        recompute();
+        renderDuofixApparateRows();
+        applyDuofixHoelzerLabel();
+        renderAdminBody();
+      });
+    });
+    const addDuofixApparatBtn = $('#add-duofix-apparat-btn');
+    if(addDuofixApparatBtn) addDuofixApparatBtn.addEventListener('click', ()=>{
+      const label = $('#new-duofix-apparat-label').value.trim();
+      const price = parseFloat($('#new-duofix-apparat-price').value)||PRICES.duofixProApparat;
+      if(!label){ alert('Bitte eine Bezeichnung angeben.'); return; }
+      const key = 'ap'+Date.now();
+      PRICES.duofixApparate.push({key, label, price});
+      fsSaveSettings();
+      recompute();
+      renderDuofixApparateRows();
+      applyDuofixHoelzerLabel();
+      renderAdminBody();
     });
     const pricesBtn2 = $('#save-prices-btn-2');
     if(pricesBtn2) pricesBtn2.addEventListener('click', ()=>{
@@ -10426,6 +10633,11 @@ var qrcode = function() {
     const leistungenBtn = $('#save-leistungen-btn');
     if(leistungenBtn) leistungenBtn.addEventListener('click', ()=>{
       $all('.leistung-text').forEach(inp=>{ SETTINGS.leistungen[inp.dataset.key] = inp.value.trim(); });
+      if(!SETTINGS.leistungenOverride) SETTINGS.leistungenOverride = {};
+      $all('.leistung-override').forEach(sel=>{
+        if(sel.value==='auto') delete SETTINGS.leistungenOverride[sel.dataset.key];
+        else SETTINGS.leistungenOverride[sel.dataset.key] = sel.value;
+      });
       fsSaveSettings();
       renderAdminBody();
       alert(fsReady ? 'Inkl./Exkl.-Texte gespeichert und live synchronisiert.' : 'Inkl./Exkl.-Texte gespeichert (nur für diese Sitzung/Vorführung — keine Firebase-Verbindung).');
@@ -10441,8 +10653,9 @@ var qrcode = function() {
     if(addExtraLeistungBtn) addExtraLeistungBtn.addEventListener('click', ()=>{
       const val = $('#new-extra-leistung').value.trim();
       if(!val) return;
+      const status = $('#new-extra-leistung-status').value;
       if(!SETTINGS.extraLeistungen) SETTINGS.extraLeistungen = [];
-      SETTINGS.extraLeistungen.push(val);
+      SETTINGS.extraLeistungen.push({text:val, status});
       renderAdminBody();
     });
     $all('[data-remove-extra-leistung]').forEach(btn=>{
@@ -10453,10 +10666,19 @@ var qrcode = function() {
     });
     const saveExtraLeistungenBtn = $('#save-extra-leistungen-btn');
     if(saveExtraLeistungenBtn) saveExtraLeistungenBtn.addEventListener('click', ()=>{
-      $all('.extra-leistung-text').forEach(inp=>{ SETTINGS.extraLeistungen[parseInt(inp.dataset.index)] = inp.value.trim(); });
+      $all('.extra-leistung-text').forEach(inp=>{
+        const idx = parseInt(inp.dataset.index);
+        const existing = SETTINGS.extraLeistungen[idx];
+        const prevStatus = typeof existing==='string' ? 'auto' : (existing&&existing.status)||'auto';
+        SETTINGS.extraLeistungen[idx] = {text: inp.value.trim(), status: prevStatus};
+      });
+      $all('.extra-leistung-status').forEach(sel=>{
+        const idx = parseInt(sel.dataset.index);
+        if(SETTINGS.extraLeistungen[idx]) SETTINGS.extraLeistungen[idx].status = sel.value;
+      });
       fsSaveSettings();
       renderAdminBody();
-      alert(fsReady ? 'Zusätzliche Inklusiv-Positionen gespeichert und live synchronisiert.' : 'Zusätzliche Inklusiv-Positionen gespeichert (nur für diese Sitzung/Vorführung — keine Firebase-Verbindung).');
+      alert(fsReady ? 'Zusätzliche Positionen gespeichert und live synchronisiert.' : 'Zusätzliche Positionen gespeichert (nur für diese Sitzung/Vorführung — keine Firebase-Verbindung).');
     });
     const addMonteurBtn = $('#add-monteur-btn');
     if(addMonteurBtn) addMonteurBtn.addEventListener('click', ()=>{
@@ -11731,6 +11953,13 @@ var qrcode = function() {
       renderAdminTabs();
       renderAdminBody();
     });
+    const gotoAuftraegeLink = $('.controlling-goto-auftraege-link');
+    if(gotoAuftraegeLink) gotoAuftraegeLink.addEventListener('click', (ev)=>{
+      ev.preventDefault();
+      adminTab = 'auftraege';
+      renderAdminTabs();
+      renderAdminBody();
+    });
     const newCustomerFromAuftraegeBtn = $('#new-customer-from-auftraege-btn');
     if(newCustomerFromAuftraegeBtn) newCustomerFromAuftraegeBtn.addEventListener('click', openNewCustomerModal);
     const newAboBtn = $('#new-abo-btn');
@@ -12048,6 +12277,9 @@ var qrcode = function() {
   applySiteLang();
   applyHeroPhoto();
   applySectionVisibility();
+  applySanitaerInklText();
+  renderDuofixApparateRows();
+  applyDuofixHoelzerLabel();
   initAssembleEffects();
   initRevealPanelsEffects();
   if($('#cust-email')) $('#cust-email').addEventListener('input', ()=>{ if(currentParts.length) updateFinalize(); });
@@ -13243,7 +13475,7 @@ function AbnahmeModal({ job, monteurName, team, onClose }){
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState({
         objekt: job.customer||'', adresse: job.address||'', kunde: job.customer||'', wohnungen:'',
-        datum: new Date().toISOString().slice(0,10),
+        datum: toLocalDateStr(new Date()),
         system: 'duofix', systemSonstiges:'',
         checkliste: Object.fromEntries(ABNAHME_PRUEFPUNKTE.map(p=>[p,null])), // null|'ja'|'nein'
         maengel: [{ anlageteil:'', mangel:'', vorgehen:'' }],
