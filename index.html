@@ -462,6 +462,51 @@
   .admin-tab.active{background:#0a7cff;color:#fff;border-color:#0a7cff;box-shadow:0 2px 10px rgba(10,124,255,.35);}
   .admin-body{padding:22px 26px 90px;max-width:1240px;margin:0 auto;}
   .admin-body.admin-body-wide{max-width:1760px;}
+  /* ===== Mobile-Optimierung Admin-Webtool ===== */
+  .admin-panel{overflow-x:hidden;} /* Sicherheitsnetz: verhindert seitliches Scrollen der GANZEN Seite,
+    falls irgendwo ein einzelnes Element zu breit ist — genau das macht ein Webtool auf dem Handy "kaputt" */
+  @media (max-width:768px){
+    html, body{overflow-x:hidden;}
+    .admin-topbar{padding:9px 12px;flex-wrap:wrap;gap:8px;}
+    .admin-topbar strong{font-size:12.5px;}
+    .admin-topbar > div:last-child{gap:6px !important;flex-wrap:wrap;justify-content:flex-end;}
+    .admin-topbar > div:last-child > span{font-size:10.5px !important;}
+    .theme-toggle-btn{padding:6px 9px;font-size:0;} /* nur Icon, Text ausblenden */
+    .theme-toggle-btn::before{content:"🌓";font-size:15px;}
+    .admin-tabs{
+      padding:8px 10px;gap:3px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;
+      scrollbar-width:none;
+    }
+    .admin-tabs::-webkit-scrollbar{display:none;}
+    .admin-tab{padding:8px 10px;font-size:11.5px;flex:0 0 auto;white-space:nowrap;}
+    .admin-body{padding:14px 12px 90px;overflow-x:hidden;}
+    .admin-page-head-icon{width:32px;height:32px;font-size:15px;}
+    .admin-page-head h2{font-size:16px;}
+    .admin-row{gap:10px;}
+    .admin-card{padding:12px 14px;}
+    .admin-modal-inner, .admin-login-box{max-width:calc(100vw - 24px);padding:18px 16px;}
+    .admin-grid2{grid-template-columns:1fr;}
+    .settings-nav{grid-template-columns:repeat(2,1fr);}
+    .kpi-grid{grid-template-columns:repeat(2,1fr);gap:9px;}
+    .kpi-card{padding:13px 13px 11px 15px;}
+    .kpi-value{font-size:19px;}
+    /* Tabellen horizontal scrollbar statt gequetscht */
+    .admin-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;}
+    .admin-table thead, .admin-table tbody, .admin-table tr{display:table;width:100%;table-layout:auto;}
+    .cal-team-filter{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap !important;}
+    .admin-search{max-width:100%;}
+    /* Flex-/Grid-Kinder dürfen auf dem Handy nie breiter als ihr Inhalt zwingen — der Hauptgrund,
+       warum einzelne dicht gepackte Zeilen (Sitzungen, Listen, Formularreihen) sonst überlaufen */
+    .admin-body *{min-width:0;}
+    .admin-body img{max-width:100%;height:auto;}
+    .folder-row, .folder-list, .obj-list-item, .apparat-row{flex-wrap:wrap;}
+    .folder-meta, .admin-meta, .obj-list-item span{overflow-wrap:break-word;word-break:break-word;}
+  }
+  @media (max-width:480px){
+    .admin-tab-icon{font-size:12px;}
+    .admin-tab{padding:7px 8px;font-size:10.5px;}
+    .kpi-grid{grid-template-columns:1fr 1fr;}
+  }
   .admin-section-title{font-size:17px;margin:0 0 14px;color:var(--adm-fg);}
   .admin-page-head{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
   .admin-page-head-icon{
@@ -545,6 +590,19 @@
   /* Statistik — etwas mehr Tiefe/Politur für Charts und Kennzahl-Karten */
   .stat-chart-card{box-shadow:0 1px 4px rgba(0,0,0,.05);}
   .stat-chart-card svg text{font-family:inherit;}
+  /* Statistik — richtige KPI-Karten statt schlichter Boxen: Farbakzent, Icon-Badge, klare Hierarchie */
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:24px;}
+  .kpi-card{
+    position:relative;background:rgba(var(--adm-fg-rgb),.03);border:1px solid rgba(var(--adm-fg-rgb),.08);
+    border-radius:16px;padding:17px 18px 15px 20px;overflow:hidden;transition:transform .15s ease,box-shadow .15s ease;
+    box-shadow:0 1px 3px rgba(0,0,0,.04);
+  }
+  .kpi-card:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.09);}
+  .kpi-accent-bar{position:absolute;top:0;left:0;width:4px;height:100%;}
+  .kpi-icon{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;margin-bottom:12px;}
+  .kpi-label{font-size:11px;color:rgba(var(--adm-fg-rgb),.5);font-weight:700;text-transform:uppercase;letter-spacing:.045em;}
+  .kpi-value{font-size:25px;font-weight:800;color:var(--adm-fg);margin:5px 0 5px;line-height:1.1;letter-spacing:-.01em;}
+  .kpi-delta{font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:3px;}
   .folder-row{
     display:flex;align-items:center;gap:9px;flex-wrap:wrap;cursor:pointer;
     padding:9px 13px;border-radius:9px;background:rgba(var(--adm-fg-rgb),.04);
@@ -3696,6 +3754,7 @@ var qrcode = function() {
   const invoices = [];     // {id, orderId, gkey, amount, kind:'akonto'|'final', sentDate, dueDate, paid, paidDate}
   const monteure = [];      // {name, phone, role, photo, email} — managed under Einstellungen
   const partners = [];      // {name, role, photo, email} — managed under Einstellungen, shown on the public Team page
+  const orgNodes = [];      // {id, name, role, parentId} — eigenständige Organigramm-Struktur (Personen ODER Abteilungen), unabhängig von partners
   const ferien = [];       // {id, monteurName, start, end} — Ferien-Übersicht im Kalender
   const vehicles = {};     // id -> {id, kennzeichen, marke, modell, policenNr, fahrzeugscheinNr, monteur, notes, docs:[{id,filename,mimeType,size,chunks}]}
   const PDF_CHUNK_SIZE = 700000; // Zeichen pro Chunk (Base64) — bleibt sicher unter dem 1 MB-Limit pro Firestore-Dokument
@@ -3759,6 +3818,7 @@ var qrcode = function() {
   const manualObjekte = {};  // objektKey -> {email, address} — empty folders created without an offer
   const objektCosts = [];    // {id, objektKey, type:'monteur'|'sub', name, hours, cost, date}
   const kreditoren = [];     // {id, supplier, description, amount, invoiceDate, dueDate, paid, paidDate, reference, objektKey, pdfDoc}
+  const abnahmeprotokolle = []; // {id, entryId, auftragsNr, objekt, adresse, kunde, wohnungen, datum, system, checkliste, maengel, unterschriftFrohTech..., unterschriftPL..., createdAt} — aus dem Froh-Kalender (Monteure)
   const abos = [];           // {id, customerEmail, customerName, product, amount, interval, nextInvoiceDate, active, createdAt}
   const lieferanten = [];    // {id, name, kundenNr, contactName, email, phone, address, notes}
   let objektCostCounter = 0;
@@ -3961,6 +4021,10 @@ var qrcode = function() {
   function fsSavePartners(){
     if(!fsReady) return;
     db.collection('meta').doc('partners').set({ list: partners }).catch(e=>console.warn('fsSavePartners', e));
+  }
+  function fsSaveOrgNodes(){
+    if(!fsReady) return;
+    db.collection('meta').doc('orgNodes').set({ list: orgNodes }).catch(e=>console.warn('fsSaveOrgNodes', e));
   }
   function fsSaveSettings(){
     if(!fsReady) return;
@@ -4336,6 +4400,7 @@ var qrcode = function() {
       db.collection('objektMeta').get(),
       db.collection('objektCosts').get(),
       db.collection('kreditoren').get(),
+      db.collection('abnahmeprotokolle').get(),
       db.collection('abos').get(),
       db.collection('lieferanten').get(),
       db.collection('manualObjekte').get(),
@@ -4343,6 +4408,7 @@ var qrcode = function() {
       db.collection('contactMessages').get(),
       db.collection('meta').doc('monteure').get(),
       db.collection('meta').doc('partners').get(),
+      db.collection('meta').doc('orgNodes').get(),
       db.collection('meta').doc('team').get(),
       db.collection('meta').doc('settings').get(),
       db.collection('meta').doc('showcase').get(),
@@ -4353,7 +4419,7 @@ var qrcode = function() {
       db.collection('adminUsers').get(),
       ...GROUPS.map(g=> db.collection('bookings').doc(g.key).get())
     ]).then(results=>{
-      const [ordersSnap, invSnap, custSnap, hoursSnap, moSnap, messagesSnap, sitzungenSnap, objMetaSnap, objCostSnap, kreditorenSnap, abosSnap, lieferantenSnap, manualObjSnap, ferienSnap, contactSnap, monteureDoc, partnersDoc, teamDoc, settingsDoc, showcaseDoc, heroPhotoDoc, kalHoursSnap, ferienMainSnap, vehiclesSnap, adminUsersSnap, ...bookingDocs] = results;
+      const [ordersSnap, invSnap, custSnap, hoursSnap, moSnap, messagesSnap, sitzungenSnap, objMetaSnap, objCostSnap, kreditorenSnap, abnahmeSnap, abosSnap, lieferantenSnap, manualObjSnap, ferienSnap, contactSnap, monteureDoc, partnersDoc, orgNodesDoc, teamDoc, settingsDoc, showcaseDoc, heroPhotoDoc, kalHoursSnap, ferienMainSnap, vehiclesSnap, adminUsersSnap, ...bookingDocs] = results;
       ordersSnap.forEach(doc=>{ const o = deserializeOrder(doc.data()); orders[o.id] = o; });
       invSnap.forEach(doc=>{
         const d = doc.data();
@@ -4371,6 +4437,7 @@ var qrcode = function() {
       objMetaSnap.forEach(doc=>{ const d=doc.data(); objektMaterial[doc.id] = d.materialCost || 0; if(d.status) objektStatus[doc.id] = d.status; });
       objCostSnap.forEach(doc=>{ const d = doc.data(); objektCosts.push({ ...d, date:new Date(d.date) }); });
       kreditorenSnap.forEach(doc=>{ const d = doc.data(); kreditoren.push({ ...d, invoiceDate:new Date(d.invoiceDate), dueDate:d.dueDate?new Date(d.dueDate):null, paidDate:d.paidDate?new Date(d.paidDate):null }); });
+      abnahmeSnap.forEach(doc=>{ abnahmeprotokolle.push(doc.data()); });
       abosSnap.forEach(doc=>{ const d = doc.data(); abos.push({ ...d, nextInvoiceDate:new Date(d.nextInvoiceDate), createdAt:new Date(d.createdAt) }); });
       lieferantenSnap.forEach(doc=>{ lieferanten.push(doc.data()); });
       manualObjSnap.forEach(doc=>{ manualObjekte[doc.id] = doc.data(); });
@@ -4378,6 +4445,7 @@ var qrcode = function() {
       contactSnap.forEach(doc=>{ const d = doc.data(); contactMessages.push({ ...d, date: new Date(d.date) }); });
       if(monteureDoc.exists){ monteure.length=0; (monteureDoc.data().list||[]).forEach(m=> monteure.push(m)); }
       if(partnersDoc.exists){ partners.length=0; (partnersDoc.data().list||[]).forEach(p=> partners.push(p)); }
+      if(orgNodesDoc.exists){ orgNodes.length=0; (orgNodesDoc.data().list||[]).forEach(n=> orgNodes.push(n)); }
       if(teamDoc.exists){ const list = teamDoc.data().list; if(list && list.length){ TEAM.length=0; list.forEach(m=>TEAM.push(m)); } }
       if(settingsDoc.exists){
         const d = settingsDoc.data();
@@ -4519,6 +4587,9 @@ var qrcode = function() {
     db.collection('meta').doc('partners').onSnapshot(doc=>{
       if(doc.exists){ partners.length=0; (doc.data().list||[]).forEach(p=>partners.push(p)); refreshAdmin(); renderTeamGrids(); }
     }, e=>console.warn('partners listener', e));
+    db.collection('meta').doc('orgNodes').onSnapshot(doc=>{
+      if(doc.exists){ orgNodes.length=0; (doc.data().list||[]).forEach(n=>orgNodes.push(n)); refreshAdmin(); renderTeamGrids(); }
+    }, e=>console.warn('orgNodes listener', e));
     db.collection('meta').doc('team').onSnapshot(doc=>{
       if(doc.exists){ const list = doc.data().list; if(list && list.length){ TEAM.length=0; list.forEach(m=>TEAM.push(m)); refreshAdmin(); } }
     }, e=>console.warn('team listener', e));
@@ -4552,6 +4623,11 @@ var qrcode = function() {
       snap.forEach(doc=>{ const d = doc.data(); kreditoren.push({ ...d, invoiceDate:new Date(d.invoiceDate), dueDate:d.dueDate?new Date(d.dueDate):null, paidDate:d.paidDate?new Date(d.paidDate):null }); });
       refreshAdmin();
     }, e=>console.warn('kreditoren listener', e));
+    db.collection('abnahmeprotokolle').onSnapshot(snap=>{
+      abnahmeprotokolle.length = 0;
+      snap.forEach(doc=> abnahmeprotokolle.push(doc.data()));
+      refreshAdmin();
+    }, e=>console.warn('abnahmeprotokolle listener', e));
     db.collection('abos').onSnapshot(snap=>{
       abos.length = 0;
       snap.forEach(doc=>{ const d = doc.data(); abos.push({ ...d, nextInvoiceDate:new Date(d.nextInvoiceDate), createdAt:new Date(d.createdAt) }); });
@@ -4659,7 +4735,7 @@ var qrcode = function() {
     if(total < 3){
       tage = 1;
       const amt = gisSmallOrderPrice();
-      lines.push({label:`Pauschale Kleinauftrag (2 Monteure, Tagesansatz inkl. Anfahrt) — ${total} Element${total!==1?'e':''} (${v} Vorwand, ${t} Trennwand)`, amount:amt});
+      lines.push({label:`Pauschale Kleinauftrag (2 Monteure, Tagesansatz inkl. Anfahrt) × ${total} Element${total!==1?'e':''} (${v} Vorwand, ${t} Trennwand)`, amount:amt});
       grand = amt;
     } else {
       tage = ceilDiv(v,10) + ceilDiv(t,5);
@@ -5377,26 +5453,46 @@ var qrcode = function() {
       : `<p class="team-empty">Unser Team wird hier in Kürze vorgestellt.</p>`;
     renderOrganigramm();
   }
+  // Migriert einmalig aus der alten (an Team-Mitglieder gekoppelten) Struktur, falls orgNodes noch leer ist
+  // aber schon Team-Mitglieder existieren — damit das bisherige Aussehen nicht plötzlich verschwindet.
+  function ensureOrgNodesSeeded(){
+    if(orgNodes.length || !partners.length) return false;
+    partners.forEach((p,i)=>{
+      orgNodes.push({ id:'org-'+Math.random().toString(36).slice(2,10), name:p.name, role:p.role||'', parentId:null });
+    });
+    orgNodes.forEach((n,i)=>{ if(i>0) n.parentId = orgNodes[0].id; });
+    return true;
+  }
+  function buildOrgTree(){
+    ensureOrgNodesSeeded();
+    const nodeById = {};
+    orgNodes.forEach(n=>{ nodeById[n.id] = { node:n, children:[] }; });
+    const roots = [];
+    orgNodes.forEach(n=>{
+      const wrapped = nodeById[n.id];
+      if(n.parentId && nodeById[n.parentId] && n.parentId!==n.id) nodeById[n.parentId].children.push(wrapped);
+      else roots.push(wrapped);
+    });
+    return roots;
+  }
+  function renderOrgNode(wrapped, isRoot){
+    const n = wrapped.node;
+    const cardHtml = `<div class="org-card ${isRoot?'org-root':''}">
+      <div class="org-card-title">${n.role||''}</div>
+      <div class="org-card-name">${n.name}</div>
+    </div>`;
+    const childrenHtml = wrapped.children.length ? `<div class="org-branch-row">${wrapped.children.map(c=>`<div class="org-branch">${renderOrgNode(c,false)}</div>`).join('')}</div>` : '';
+    return cardHtml + childrenHtml;
+  }
   function renderOrganigramm(){
     const tree = document.getElementById('org-tree');
     if(!tree) return;
-    if(!partners.length){ tree.innerHTML = `<p class="team-empty">Organigramm wird hier in Kürze vorgestellt.</p>`; return; }
-    const root = partners[0];
-    const rest = partners.slice(1);
-    tree.innerHTML = `
-      <div class="org-card org-root">
-        <div class="org-card-title">${root.role||''}</div>
-        <div class="org-card-name">${root.name}</div>
-      </div>
-      ${rest.length ? `<div class="org-branch-row">
-        ${rest.map(p=>`
-          <div class="org-branch">
-            <div class="org-card">
-              <div class="org-card-title">${p.role||''}</div>
-              <div class="org-card-name">${p.name}</div>
-            </div>
-          </div>`).join('')}
-      </div>` : ''}`;
+    if(!orgNodes.length && !partners.length){ tree.innerHTML = `<p class="team-empty">Organigramm wird hier in Kürze vorgestellt.</p>`; return; }
+    const roots = buildOrgTree();
+    if(!roots.length){ tree.innerHTML = `<p class="team-empty">Organigramm wird hier in Kürze vorgestellt.</p>`; return; }
+    tree.innerHTML = roots.length===1
+      ? renderOrgNode(roots[0], true)
+      : `<div class="org-branch-row" style="margin-top:0;">${roots.map(r=>`<div class="org-branch" style="align-items:center;">${renderOrgNode(r,true)}</div>`).join('')}</div>`;
   }
   function recompute(){
     renderOrderSummary();
@@ -6554,6 +6650,7 @@ var qrcode = function() {
               <div class="admin-meta">${e.orderId} · ${e.group.range.length}/${e.group.requiredDays} Arbeitstag(e) · ${chf(amt)}</div>
             </div>
             <div style="display:flex;gap:6px;">
+              <button class="obj-mini anfrage-pdf-btn" data-order="${e.orderId}" data-group="${e.gkey}">📄 Als PDF exportieren</button>
               <button class="obj-mini primary admin-act" data-act="confirm">✓ Bestätigen</button>
               <button class="obj-mini admin-act" data-act="decline">Ablehnen</button>
             </div>
@@ -7352,6 +7449,15 @@ var qrcode = function() {
     {key:'ausflockung', label:'Ausflockung-Termine', color:'#b45309', icon:'❄️'},
     {key:'ausflockungM3', label:'Ausflockung (m³)', color:'#d97706', icon:'📦', unit:'m³'},
   ];
+  function kpiCardHtml(icon, color, label, value, deltaHtml){
+    return `<div class="kpi-card">
+      <div class="kpi-accent-bar" style="background:${color};"></div>
+      <div class="kpi-icon" style="background:${color}22;color:${color};">${icon}</div>
+      <div class="kpi-label">${label}</div>
+      <div class="kpi-value" style="font-size:${typeof value==='string'&&value.length>8?'21px':'25px'};">${value}</div>
+      ${deltaHtml||''}
+    </div>`;
+  }
   function adminArchivHtml(){
     const y = statsMonthCursor.getFullYear(), m = statsMonthCursor.getMonth();
     const cur = computeMonthStats(y, m);
@@ -7366,7 +7472,7 @@ var qrcode = function() {
     const maxYear = Math.max(1, ...yearTotals);
 
     let html = `${pageHeaderHtml('📊','Statistik','Auswertung Anfragen, Offerten und Termine — pro Monat oder Jahr.')}
-      <div class="admin-card" style="margin-bottom:18px;">
+      <div class="admin-card" style="margin-bottom:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
           <div style="display:flex;align-items:center;gap:10px;">
             <button class="obj-mini" id="stats-prev-month">‹</button>
@@ -7380,38 +7486,34 @@ var qrcode = function() {
           </div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px;">
+      <div class="kpi-grid">
         ${STAT_CATS.map(c=>{
           const delta = statDelta(cur[c.key], prev[c.key]);
-          return `<div class="admin-card" style="padding:16px;">
-            <div style="font-size:12px;color:rgba(var(--adm-fg-rgb),.55);font-weight:700;text-transform:uppercase;letter-spacing:.03em;">${c.icon} ${c.label}</div>
-            <div style="font-size:28px;font-weight:800;color:var(--adm-fg);margin:6px 0 4px;">${cur[c.key]}${c.unit?' '+c.unit:''}</div>
-            ${delta ? `<div style="font-size:12.5px;font-weight:700;color:${delta.up?'#16a34a':'#dc3545'};">${delta.up?'▲':'▼'} ${delta.pct}% ggü. Vormonat</div>` : `<div style="font-size:12.5px;color:rgba(var(--adm-fg-rgb),.4);">kein Vergleichswert</div>`}
-          </div>`;
+          const deltaHtml = delta
+            ? `<div class="kpi-delta" style="color:${delta.up?'#16a34a':'#dc3545'};">${delta.up?'▲':'▼'} ${delta.pct}% ggü. Vormonat</div>`
+            : `<div class="kpi-delta" style="color:rgba(var(--adm-fg-rgb),.4);font-weight:500;">kein Vergleichswert</div>`;
+          return kpiCardHtml(c.icon, c.color, c.label, `${cur[c.key]}${c.unit?' '+c.unit:''}`, deltaHtml);
         }).join('')}
       </div>
       <div class="settings-section-label">🔧 Montierte Elemente (aus dem Froh-Kalender)</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;">
+      <div class="kpi-grid">
         ${(()=>{
           const dayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
           const dayEnd = addDays(dayStart,1);
           const weekStart = mondayOf(today);
           const weekEnd = addDays(weekStart,7);
           const rows = [
-            {label:'Heute', val: installedElementsInRange(dayStart, dayEnd)},
-            {label:'Diese Woche', val: installedElementsInRange(weekStart, weekEnd)},
-            {label:monthLabel, val: installedElementsInRange(new Date(y,m,1), new Date(y,m+1,1))},
-            {label:'Dieses Jahr', val: installedElementsInRange(new Date(y,0,1), new Date(y+1,0,1))},
+            {label:'Heute', icon:'📅', color:'#0a7cff', val: installedElementsInRange(dayStart, dayEnd)},
+            {label:'Diese Woche', icon:'🗓', color:'#2563eb', val: installedElementsInRange(weekStart, weekEnd)},
+            {label:monthLabel, icon:'📆', color:'#7c3aed', val: installedElementsInRange(new Date(y,m,1), new Date(y,m+1,1))},
+            {label:'Dieses Jahr', icon:'📈', color:'#059669', val: installedElementsInRange(new Date(y,0,1), new Date(y+1,0,1))},
           ];
-          return rows.map(r=>`<div class="admin-card" style="padding:16px;">
-            <div style="font-size:12px;color:rgba(var(--adm-fg-rgb),.55);font-weight:700;text-transform:uppercase;letter-spacing:.03em;">${r.label}</div>
-            <div style="font-size:28px;font-weight:800;color:var(--adm-fg);margin:6px 0 4px;">${r.val}</div>
-          </div>`).join('');
+          return rows.map(r=>kpiCardHtml(r.icon, r.color, r.label, String(r.val))).join('');
         })()}
       </div>
 
       <div class="settings-section-label">🔁 Abos</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px;">
+      <div class="kpi-grid">
         ${(()=>{
           const activeAbos = abos.filter(a=>a.active);
           const mrr = activeAbos.reduce((sum,a)=>{
@@ -7420,15 +7522,12 @@ var qrcode = function() {
           }, 0);
           const dueNow = abos.filter(a=>a.active && a.nextInvoiceDate<=today).length;
           const rows = [
-            {label:'Aktive Abos', val: activeAbos.length},
-            {label:'Wiederk. Umsatz / Monat (MRR)', val: chf(Math.round(mrr*100)/100)},
-            {label:'Hochgerechnet pro Jahr', val: chf(Math.round(mrr*12*100)/100)},
-            {label:'Aktuell fällig', val: dueNow},
+            {label:'Aktive Abos', icon:'🔁', color:'#0891b2', val: String(activeAbos.length)},
+            {label:'Wiederk. Umsatz / Monat (MRR)', icon:'💳', color:'#0a7cff', val: chf(Math.round(mrr*100)/100)},
+            {label:'Hochgerechnet pro Jahr', icon:'📊', color:'#7c3aed', val: chf(Math.round(mrr*12*100)/100)},
+            {label:'Aktuell fällig', icon:'⏰', color: dueNow>0?'#dc3545':'#16a34a', val: String(dueNow)},
           ];
-          return rows.map(r=>`<div class="admin-card" style="padding:16px;">
-            <div style="font-size:12px;color:rgba(var(--adm-fg-rgb),.55);font-weight:700;text-transform:uppercase;letter-spacing:.03em;">${r.label}</div>
-            <div style="font-size:${typeof r.val==='string'&&r.val.length>8?'22px':'28px'};font-weight:800;color:var(--adm-fg);margin:6px 0 4px;">${r.val}</div>
-          </div>`).join('');
+          return rows.map(r=>kpiCardHtml(r.icon, r.color, r.label, r.val)).join('');
         })()}
       </div>
 
@@ -7844,6 +7943,15 @@ var qrcode = function() {
       </div>`;
     }).join('') : '<div class="obj-empty">Noch keine Kreditorenrechnungen für dieses Objekt erfasst.</div>';
 
+    const objektAbnahmeprotokolle = abnahmeprotokolle.filter(ap=>abnahmeprotokollObjektKey(ap)===key).sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+    const abnahmeprotokolleHtml = objektAbnahmeprotokolle.length ? objektAbnahmeprotokolle.map(ap=>{
+      const maengelCount = (ap.maengel||[]).length;
+      return `<div class="obj-list-item">
+        <span>📋 Abnahmeprotokoll vom ${ap.datum?new Date(ap.datum).toLocaleDateString('de-CH'):'—'} · ${ap.unterschriftFrohTechName||'—'}${maengelCount?` · <span style="color:#f59e0b;">⚠️ ${maengelCount} Mangel${maengelCount!==1?'-Positionen':''}</span>`:' · ✅ ohne Mängel'}</span>
+        <button class="obj-mini abnahmeprotokoll-pdf-btn" data-id="${ap.id}">📄 Als PDF exportieren</button>
+      </div>`;
+    }).join('') : '<div class="obj-empty">Noch kein Abnahmeprotokoll für dieses Objekt.</div>';
+
     let html = kundenBreadcrumbHtml(crumbs);
     html += `
       <div class="obj-header">
@@ -7904,6 +8012,13 @@ var qrcode = function() {
           ${!closed?`<button class="obj-mini" id="add-objekt-kreditor-btn">+ erfassen</button>`:''}
         </div>
         ${kreditorenHtml}
+      </div>
+
+      <div class="obj-section">
+        <div class="obj-section-title">
+          <span>Abnahmeprotokolle (Vorwandsysteme)</span>
+        </div>
+        ${abnahmeprotokolleHtml}
       </div>
 
       <div class="obj-section">
@@ -8173,26 +8288,51 @@ var qrcode = function() {
   // LIEFERANTEN — feste Lieferanten-/Partnerstammdaten (inkl. unserer eigenen Kundennummer bei ihnen),
   // die bei Kreditorenrechnungen ausgewählt werden können, statt den Namen jedes Mal neu einzutippen.
   // ============================================================
+  let lieferantExpanded = null; // id des aktuell aufgeklappten Lieferanten (Konditionen & Produkte)
   function adminLieferantenHtml(){
-    let html = `${pageHeaderHtml('🚚','Lieferanten','Feste Lieferanten und Partner — mit eigener Kundennummer, für schnelle Kreditoren-Erfassung.')}
+    let html = `${pageHeaderHtml('🚚','Lieferanten','Feste Lieferanten und Partner — mit eigener Kundennummer, Konditionen und Produkten (EK), für schnelle Kreditoren-Erfassung.')}
       <div class="admin-actions" style="margin-bottom:16px;"><button class="btn btn-secondary btn-sm" id="new-lieferant-btn">+ Lieferant erfassen</button></div>`;
     if(!lieferanten.length){ html += `<div class="admin-empty">Noch keine Lieferanten erfasst.</div>`; return html; }
     const sorted = lieferanten.slice().sort((a,b)=>a.name.localeCompare(b.name));
     html += `<div class="folder-list">` + sorted.map(l=>{
       const openKreditoren = kreditoren.filter(k=>k.lieferantId===l.id && !k.paid);
       const sumOffen = Math.round(openKreditoren.reduce((a,k)=>a+k.amount,0)*100)/100;
-      return `<div class="admin-card" style="padding:14px 18px;">
-        <div class="admin-row" style="align-items:center;">
+      const expanded = lieferantExpanded===l.id;
+      const produkte = l.produkte||[];
+      return `<div class="admin-card" data-lieferant="${l.id}" style="padding:14px 18px;">
+        <div class="admin-row" style="align-items:center;cursor:pointer;" data-act="toggle-lieferant">
           <div>
             <div style="font-weight:650;font-size:14.5px;color:var(--adm-fg);">🚚 ${l.name}</div>
             <div class="folder-meta">${l.kundenNr?`Unsere Kundennr.: ${l.kundenNr} · `:''}${l.contactName?`${l.contactName} · `:''}${l.email||''}${l.phone?` · ${l.phone}`:''}</div>
             ${openKreditoren.length?`<div class="folder-meta">⏳ ${openKreditoren.length} offene Rechnung${openKreditoren.length!==1?'en':''} · ${chf(sumOffen)}</div>`:''}
+            ${produkte.length?`<div class="folder-meta">📦 ${produkte.length} Produkt${produkte.length!==1?'e':''} hinterlegt</div>`:''}
           </div>
-          <div style="display:flex;gap:6px;">
+          <div style="display:flex;gap:6px;align-items:center;">
             <button class="obj-mini lieferant-edit-btn" data-id="${l.id}">✏️ Bearbeiten</button>
             <button class="obj-mini danger lieferant-delete-btn" data-id="${l.id}">🗑️</button>
+            <span style="font-size:13px;color:rgba(var(--adm-fg-rgb),.5);">${expanded?'▲':'▼'}</span>
           </div>
         </div>
+        ${expanded ? `
+          <div style="margin-top:14px;">
+            <div class="settings-section-label" style="margin-top:0;">Konditionen</div>
+            <div class="admin-card">
+              <div class="admin-field" style="margin-bottom:8px;"><textarea class="lieferant-konditionen-field" data-id="${l.id}" rows="3" placeholder="z. B. 30 Tage netto, 2% Skonto bei Zahlung innert 10 Tagen">${l.konditionen||''}</textarea></div>
+              <button class="obj-mini primary lieferant-save-konditionen-btn" data-id="${l.id}">Konditionen speichern</button>
+            </div>
+            <div class="settings-section-label">Produkte &amp; Einkaufspreise (EK)</div>
+            <div class="admin-card">
+              ${produkte.length ? `<table class="admin-table"><thead><tr><th>Produkt</th><th>Einheit</th><th class="num">EK</th><th></th></tr></thead>
+                <tbody>${produkte.map(pr=>`<tr><td>${pr.name}</td><td>${pr.einheit||'—'}</td><td class="num">${chf(pr.ek)}</td><td><button class="obj-mini danger lieferant-produkt-delete-btn" data-id="${l.id}" data-produkt="${pr.id}">✕</button></td></tr>`).join('')}</tbody>
+              </table>` : '<div class="admin-empty" style="padding:6px 0;">Noch keine Produkte erfasst.</div>'}
+              <div class="admin-grid2" style="margin-top:14px;">
+                <div class="admin-field" style="margin-bottom:0;"><label>Produktname</label><input type="text" class="new-produkt-name" data-id="${l.id}" placeholder="z. B. GKB-Platte 12.5mm"></div>
+                <div class="admin-field" style="margin-bottom:0;"><label>Einheit (optional)</label><input type="text" class="new-produkt-einheit" data-id="${l.id}" placeholder="z. B. m², Stk."></div>
+              </div>
+              <div class="admin-field" style="margin-top:10px;max-width:220px;"><label>EK (CHF)</label><input type="number" class="new-produkt-ek" data-id="${l.id}" value="0"></div>
+              <button class="obj-mini primary lieferant-add-produkt-btn" data-id="${l.id}" style="margin-top:4px;">+ Produkt hinzufügen</button>
+            </div>
+          </div>` : ''}
       </div>`;
     }).join('') + `</div>`;
     return html;
@@ -8210,6 +8350,7 @@ var qrcode = function() {
         <div class="admin-field"><label>Adresse</label><input type="text" id="lf-address" value="${existing?(existing.address||'').replace(/"/g,'&quot;'):''}"></div>
       </div>
       <div class="admin-field"><label>Notizen (optional)</label><input type="text" id="lf-notes" value="${existing?(existing.notes||'').replace(/"/g,'&quot;'):''}"></div>
+      <div class="admin-field"><label>Konditionen (Zahlungsziel, Rabatte, Lieferbedingungen usw.)</label><textarea id="lf-konditionen" rows="3" placeholder="z. B. 30 Tage netto, 2% Skonto bei Zahlung innert 10 Tagen">${existing?(existing.konditionen||''):''}</textarea></div>
       <div class="admin-actions"><button class="btn btn-primary btn-sm" id="lf-save-btn">Speichern</button></div>`);
     overlay.querySelector('#lf-save-btn').addEventListener('click', ()=>{
       const name = overlay.querySelector('#lf-name').value.trim();
@@ -8223,6 +8364,8 @@ var qrcode = function() {
         email: overlay.querySelector('#lf-email').value.trim(),
         address: overlay.querySelector('#lf-address').value.trim(),
         notes: overlay.querySelector('#lf-notes').value.trim(),
+        konditionen: overlay.querySelector('#lf-konditionen').value.trim(),
+        produkte: existing ? (existing.produkte||[]) : [],
       };
       if(existing) Object.assign(existing, l); else lieferanten.push(l);
       fsSaveLieferant(l);
@@ -9282,6 +9425,134 @@ var qrcode = function() {
     if(mo) return mo.customerAddress || mo.customerName;
     return h.orderId || h.customer || '—';
   }
+  // Löst für ein im Froh-Kalender erstelltes Abnahmeprotokoll den zugehörigen Objektordner auf
+  // (über die Auftragsnr., genau wie bei den Stunden-Einträgen aus dem Kalender).
+  function abnahmeprotokollObjektKey(ap){
+    if(!ap.auftragsNr) return null;
+    if(orders[ap.auftragsNr]) return objektKey(orders[ap.auftragsNr].customer.email, orders[ap.auftragsNr].customer.address);
+    const mo = manualOffers.find(m=>m.id===ap.auftragsNr);
+    if(mo) return objektKey(mo.customerEmail, mo.customerAddress);
+    return null;
+  }
+  const ABNAHME_PRUEFPUNKTE_LIST = [
+    'Raummasse laut Detailplan eingehalten',
+    'Vorwände im Blei erstellt',
+    'Befestigungsabstände laut Hersteller eingehalten',
+    'Vorwände im Winkel',
+    'Alle relevanten Höhen eingehalten (Anschlüsse, Nischen etc.)',
+    'Montagewinkel vom Bauwerk entkoppelt',
+    'Kein direkter Kontakt vom Vorwandsystem zum Bauwerk',
+    'Vorwand mit Gips / Mörtel verunreinigt',
+  ];
+  // Druckt das Abnahmeprotokoll eng am Layout des Papier-Originals — Projekt/Ansprechpartner als
+  // beschriftete Zweispalten-Felder, System als Checkbox-Zeile, Ja/Nein-Checkliste, Mängeltabelle
+  // und beide Unterschriften. Bewusst mit reinen Inline-Styles statt Admin-Panel-CSS-Klassen, damit
+  // beim Drucken nichts unerwartet ausgeblendet wird.
+  function buildAbnahmeprotokollHtml(ap){
+    const AP_BLUE = '#2f6fb0';
+    const AP_BLUE_DARK = '#1d4e7d';
+    const AP_YELLOW = '#f6c445';
+    const AP_YELLOW_BG = '#fef6e0';
+    const AP_LIGHTBLUE = '#eaf2fa';
+    let circleN = 0;
+    const sectionTitle = t => {
+      circleN++;
+      return `<div style="display:flex;align-items:center;gap:9px;margin:26px 0 12px;">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${AP_YELLOW};color:#1d1d1f;font-size:11px;font-weight:800;flex:0 0 auto;">${circleN}</span>
+        <span style="font-weight:700;font-size:13.5px;color:${AP_BLUE_DARK};">${t}</span>
+      </div>`;
+    };
+    const fieldLabel = t => `<div style="font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#888;margin-bottom:3px;">${t}</div>`;
+    const thStyle = `text-align:left;padding:8px 10px;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:#fff;background:${AP_BLUE};`;
+    const checkRows = ABNAHME_PRUEFPUNKTE_LIST.map((p,i)=>{
+      const v = (ap.checkliste||{})[p];
+      const schallschutzStart = i===5; // die letzten 3 Punkte sind die Schallschutz-Prüfpunkte, wie im Original
+      const box = checked => `<span style="display:inline-block;width:14px;height:14px;border:1.5px solid #666;text-align:center;line-height:12px;font-size:11px;">${checked?'☑':''}</span>`;
+      return `${schallschutzStart?`<tr><td colspan="3" style="padding:6px 10px;font-weight:700;font-size:11px;color:${AP_BLUE_DARK};background:${AP_LIGHTBLUE};">Schallschutz</td></tr>`:''}
+        <tr><td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;">${p}</td>
+          <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center;width:40px;">${box(v==='ja')}</td>
+          <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center;width:40px;">${box(v==='nein')}</td></tr>`;
+    }).join('');
+    const maengelRows = (ap.maengel||[]).length
+      ? ap.maengel.map(m=>`<tr><td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;">${m.anlageteil||'—'}</td><td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;">${m.mangel||'—'}</td><td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;">${m.vorgehen||'—'}</td></tr>`).join('')
+      : `<tr><td colspan="3" style="padding:12px 10px;text-align:center;color:#999;font-size:12px;">Keine Mängel festgestellt.</td></tr>`;
+    const sysBox = val => `<span style="display:inline-block;width:14px;height:14px;border:1.5px solid #666;text-align:center;line-height:12px;font-size:11px;margin-right:6px;vertical-align:-2px;">${ap.system===val?'☑':''}</span>`;
+    return `
+      <div class="offer-doc" style="max-width:800px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid ${AP_BLUE};padding-bottom:14px;margin-bottom:4px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <img src="${SETTINGS.logoDataUrl}" alt="${SETTINGS.name}" style="height:44px;">
+            <div>
+              <div style="font-size:20px;font-weight:800;color:#1d1d1f;">Abnahmeprotokoll</div>
+              <div style="font-size:11.5px;color:#777;margin-top:2px;">Vorwandsysteme · sauber montiert, gemeinsam abgenommen</div>
+            </div>
+          </div>
+          <div style="background:${AP_YELLOW};color:#1d1d1f;font-weight:800;font-size:12px;padding:7px 16px;border-radius:980px;white-space:nowrap;">Check &amp; Go!</div>
+        </div>
+
+        ${sectionTitle('Projekt &amp; Ansprechpartner')}
+        <div style="border:1.5px solid #e2e2e2;border-radius:10px;padding:14px 18px;margin-bottom:6px;">
+          <table style="width:100%;border-collapse:collapse;"><tbody>
+            <tr>
+              <td style="width:50%;padding:0 20px 12px 0;vertical-align:top;">${fieldLabel('Objekt')}<div style="font-size:13.5px;color:#1d1d1f;border-bottom:1px solid #ddd;padding-bottom:3px;">${ap.objekt||'—'}</div>${ap.adresse?`<div style="font-size:10.5px;color:#999;margin-top:3px;">${ap.adresse}</div>`:''}</td>
+              <td style="width:50%;padding:0 0 12px 0;vertical-align:top;">${fieldLabel('Datum')}<div style="font-size:13.5px;color:#1d1d1f;border-bottom:1px solid #ddd;padding-bottom:3px;">${ap.datum ? new Date(ap.datum).toLocaleDateString('de-CH') : '—'}</div></td>
+            </tr>
+            <tr>
+              <td style="padding:0 20px 0 0;vertical-align:top;">${fieldLabel('Kunde')}<div style="font-size:13.5px;color:#1d1d1f;border-bottom:1px solid #ddd;padding-bottom:3px;">${ap.kunde||'—'}</div></td>
+              <td style="vertical-align:top;">${fieldLabel('Wohnungen')}<div style="font-size:13.5px;color:#1d1d1f;border-bottom:1px solid #ddd;padding-bottom:3px;">${ap.wohnungen||'—'}</div></td>
+            </tr>
+          </tbody></table>
+        </div>
+
+        ${sectionTitle('System')}
+        <div style="border:1.5px solid #e2e2e2;border-radius:10px;padding:14px 18px;margin-bottom:6px;">
+          ${sysBox('duofix')}<span style="font-size:12.5px;margin-right:26px;">Geberit Duofix</span>
+          ${sysBox('gis')}<span style="font-size:12.5px;margin-right:26px;">Geberit GIS</span>
+          ${sysBox('sonstiges')}<span style="font-size:12.5px;">Sonstiges: ${ap.system==='sonstiges'?(ap.systemSonstiges||'—'):'__________'}</span>
+        </div>
+
+        ${sectionTitle('Montage &amp; Schallschutz')}
+        <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
+          <thead><tr>
+            <th style="${thStyle}">Prüfpunkt</th>
+            <th style="${thStyle}text-align:center;width:40px;">Ja</th>
+            <th style="${thStyle}text-align:center;width:40px;">Nein</th>
+          </tr></thead>
+          <tbody>${checkRows}</tbody>
+        </table>
+
+        ${sectionTitle('Mängel &amp; weiteres Vorgehen')}
+        <table style="width:100%;border-collapse:collapse;margin-bottom:14px;">
+          <thead><tr>
+            <th style="${thStyle}">Anlageteil</th>
+            <th style="${thStyle}">Mangel / Feststellung</th>
+            <th style="${thStyle}">Weiteres Vorgehen</th>
+          </tr></thead>
+          <tbody>${maengelRows}</tbody>
+        </table>
+        <div style="background:${AP_YELLOW_BG};border:1px solid ${AP_YELLOW};border-radius:8px;padding:9px 14px;font-size:11.5px;color:#7a5c00;margin-bottom:36px;">★ Ohne Mängel gehen alle Vorwände in die Obhut des Sanitärinstallateurs über.</div>
+
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="width:50%;padding-right:24px;vertical-align:bottom;">
+              <div style="height:58px;display:flex;align-items:flex-end;">${ap.unterschriftFrohText ? `<img src="${ap.unterschriftFrohText}" style="max-width:200px;max-height:54px;">` : ''}</div>
+              <div style="border-top:1.5px solid #333;padding-top:6px;margin-top:4px;font-size:11.5px;color:${AP_BLUE_DARK};font-weight:700;">Froh-Tech</div>
+              <div style="font-size:9.5px;color:#999;">${ap.unterschriftFrohTechName?ap.unterschriftFrohTechName+' — ':''}Name / Unterschrift / Datum</div>
+            </td>
+            <td style="width:50%;vertical-align:bottom;">
+              <div style="height:58px;display:flex;align-items:flex-end;">${ap.unterschriftPL ? `<img src="${ap.unterschriftPL}" style="max-width:200px;max-height:54px;">` : ''}</div>
+              <div style="border-top:1.5px solid #333;padding-top:6px;margin-top:4px;font-size:11.5px;color:${AP_BLUE_DARK};font-weight:700;">PL Sanitär</div>
+              <div style="font-size:9.5px;color:#999;">${ap.unterschriftPLName?ap.unterschriftPLName+' — ':''}Name / Unterschrift / Datum</div>
+            </td>
+          </tr>
+        </table>
+
+        <div style="display:flex;justify-content:space-between;margin-top:30px;padding-top:12px;border-top:1px solid #eee;font-size:10.5px;">
+          <span style="color:${AP_BLUE};font-weight:700;">${SETTINGS.name} <span style="color:#999;font-weight:400;">· Abnahmeprotokoll Vorwandsysteme</span></span>
+          <span style="color:#999;">Dokument-Nr.: ${ap.id||''}</span>
+        </div>
+      </div>`;
+  }
   function adminMitarbeiterHtml(){
     let html = `${pageHeaderHtml('👷','Mitarbeiter','Stunden freigeben/anpassen, Überzeit, Ferien und Krankheit.')}`;
     if(!monteure.length){ html += `<div class="admin-empty">Noch keine Monteure erfasst — unter Einstellungen → Team &amp; Monteure hinzufügen.</div>`; return html; }
@@ -9576,7 +9847,7 @@ var qrcode = function() {
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
         <div style="display:flex;align-items:center;gap:8px;">
           <button class="obj-mini" id="sitzung-prev">‹</button>
-          <span style="font-weight:650;color:var(--adm-fg);min-width:200px;text-align:center;font-size:13.5px;">${s.weekLabel}${isCurrentWeek?' (aktuell)':''}</span>
+          <span style="font-weight:650;color:var(--adm-fg);min-width:0;text-align:center;font-size:13.5px;">${s.weekLabel}${isCurrentWeek?' (aktuell)':''}</span>
           <button class="obj-mini" id="sitzung-next">›</button>
           <button class="obj-mini" id="sitzung-heute">Heute</button>
         </div>
@@ -9665,11 +9936,51 @@ var qrcode = function() {
       </div>`;
   }
 
+  // Eigenständige Organigramm-Verwaltung: Personen ODER Abteilungen frei hinzufügen/entfernen/positionieren,
+  // unabhängig von der Team-Mitglieder-Liste (die für die öffentliche Team-Seite gedacht ist).
+  function adminOrganigrammSettingsHtml(){
+    ensureOrgNodesSeeded();
+    let html = `
+      <div class="settings-panel-title">🗂️ Organigramm</div>
+      <p class="settings-panel-sub">Baue die Struktur komplett selbst auf — füge Personen und Abteilungen hinzu und lege fest, wem sie unterstellt sind.</p>
+      <div class="admin-card">
+        ${orgNodes.length ? orgNodes.map(n=>`
+          <div class="admin-grid2" style="margin-bottom:12px;align-items:end;">
+            <div class="admin-field" style="margin-bottom:0;"><label>Name / Abteilung</label><input type="text" class="org-node-name" data-id="${n.id}" value="${(n.name||'').replace(/"/g,'&quot;')}"></div>
+            <div class="admin-field" style="margin-bottom:0;"><label>Rolle / Beschreibung</label><input type="text" class="org-node-role" data-id="${n.id}" value="${(n.role||'').replace(/"/g,'&quot;')}"></div>
+            <div class="admin-field" style="margin-bottom:0;"><label>Übergeordnet</label>
+              <select class="org-node-parent" data-id="${n.id}">
+                <option value="">— Oberste Ebene —</option>
+                ${orgNodes.filter(x=>x.id!==n.id).map(x=>`<option value="${x.id}" ${n.parentId===x.id?'selected':''}>${x.name}</option>`).join('')}
+              </select>
+            </div>
+            <button class="btn btn-ghost btn-sm" data-remove-org-node="${n.id}" style="color:var(--adm-fg);border-color:rgba(var(--adm-fg-rgb),.3);">Entfernen</button>
+          </div>`).join('') : '<div class="admin-empty" style="padding:6px 0;">Noch keine Einträge — unten die erste Person oder Abteilung hinzufügen.</div>'}
+        <button class="btn btn-primary btn-sm" id="save-org-nodes-btn" style="margin-top:6px;">Organigramm speichern</button>
+      </div>
+      <div class="settings-section-label">Neue Person / Abteilung hinzufügen</div>
+      <div class="admin-card">
+        <div class="admin-grid2">
+          <div class="admin-field" style="margin-bottom:0;"><label>Name / Abteilung</label><input type="text" id="new-org-node-name" placeholder="z. B. Alessandro Del Cotto oder 'Verkauf'"></div>
+          <div class="admin-field" style="margin-bottom:0;"><label>Rolle / Beschreibung (optional)</label><input type="text" id="new-org-node-role" placeholder="z. B. Geschäftsleiter"></div>
+        </div>
+        <div class="admin-field" style="margin-top:10px;"><label>Übergeordnet</label>
+          <select id="new-org-node-parent">
+            <option value="">— Oberste Ebene —</option>
+            ${orgNodes.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}
+          </select>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="add-org-node-btn" style="margin-top:12px;">+ Hinzufügen</button>
+      </div>
+      <p class="admin-settings-hint">Änderungen an Name/Rolle/Übergeordnet in der Liste oben werden erst nach "Organigramm speichern" übernommen. Neue Einträge und Löschungen wirken sofort.</p>`;
+    return html;
+  }
   function adminEinstellungenHtml(){
     const categories = [
       {key:'firma', icon:'🏢', label:'Firma', desc:'Kontaktdaten, Logo, MWST'},
       {key:'preise', icon:'💰', label:'Preise & Kalkulation', desc:'Preise, Zahlungskonditionen, Marge'},
       {key:'team', icon:'👥', label:'Team & Monteure', desc:'Personen auf der Team-Seite'},
+      {key:'organigramm', icon:'🗂️', label:'Organigramm', desc:'Struktur frei aufbauen'},
       {key:'texte', icon:'📝', label:'Offerten-Texte', desc:'Inkl./Exkl.-Texte'},
       {key:'web', icon:'🖼️', label:'Webseite', desc:'Homepage-Bilder & Texte'},
     ];
@@ -9846,7 +10157,7 @@ var qrcode = function() {
           <div class="apparat-row" style="flex-wrap:wrap;gap:8px;">
             <span style="display:flex;align-items:center;gap:8px;">${m.photo?`<img src="${m.photo}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;">`:''}${m.name}${m.role?' · '+m.role:(m.phone?' · '+m.phone:'')}</span>
             <span style="display:flex;align-items:center;gap:6px;margin-left:auto;">
-              <input type="text" class="edit-monteur-email" data-index="${i}" value="${m.email||''}" placeholder="E-Mail hinzufügen/ändern" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(var(--adm-fg-rgb),.16);background:rgba(var(--adm-fg-rgb),.06);color:var(--adm-fg);font-size:12.5px;width:200px;">
+              <input type="text" class="edit-monteur-email" data-index="${i}" value="${m.email||''}" placeholder="E-Mail hinzufügen/ändern" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(var(--adm-fg-rgb),.16);background:rgba(var(--adm-fg-rgb),.06);color:var(--adm-fg);font-size:12.5px;width:200px;max-width:100%;box-sizing:border-box;">
               <button class="obj-mini save-monteur-email-btn" data-index="${i}">✓</button>
               <button class="btn btn-ghost btn-sm" data-remove-monteur="${i}" style="color:var(--adm-fg);border-color:rgba(var(--adm-fg-rgb),.3);">Entfernen</button>
             </span>
@@ -9869,7 +10180,7 @@ var qrcode = function() {
           <div class="apparat-row" style="flex-wrap:wrap;gap:8px;">
             <span style="display:flex;align-items:center;gap:8px;">${p.photo?`<img src="${p.photo}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;">`:''}${p.name}${p.role?' · '+p.role:''}</span>
             <span style="display:flex;align-items:center;gap:6px;margin-left:auto;">
-              <input type="text" class="edit-partner-email" data-index="${i}" value="${p.email||''}" placeholder="E-Mail hinzufügen/ändern" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(var(--adm-fg-rgb),.16);background:rgba(var(--adm-fg-rgb),.06);color:var(--adm-fg);font-size:12.5px;width:200px;">
+              <input type="text" class="edit-partner-email" data-index="${i}" value="${p.email||''}" placeholder="E-Mail hinzufügen/ändern" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(var(--adm-fg-rgb),.16);background:rgba(var(--adm-fg-rgb),.06);color:var(--adm-fg);font-size:12.5px;width:200px;max-width:100%;box-sizing:border-box;">
               <button class="obj-mini save-partner-email-btn" data-index="${i}">✓</button>
               <button class="obj-mini edit-partner-btn" data-index="${i}">✏️ Bearbeiten</button>
               <button class="btn btn-ghost btn-sm" data-remove-partner="${i}" style="color:var(--adm-fg);border-color:rgba(var(--adm-fg-rgb),.3);">Entfernen</button>
@@ -9885,6 +10196,10 @@ var qrcode = function() {
         <button class="btn btn-secondary btn-sm" id="add-partner-btn" style="margin-top:12px;">Team-Mitglied hinzufügen</button>
       </div>
       <p class="admin-settings-hint">Bei bestehenden Personen kannst du die E-Mail direkt oben in der Liste eintragen/ändern und mit "✓" speichern.</p>`;
+    }
+
+    if(einstellungenCategory==='organigramm'){
+      html += adminOrganigrammSettingsHtml();
     }
 
     if(einstellungenCategory==='web'){
@@ -10208,6 +10523,39 @@ var qrcode = function() {
         reader.readAsDataURL(photoFile);
       } else finish(null);
     });
+    const addOrgNodeBtn = $('#add-org-node-btn');
+    if(addOrgNodeBtn) addOrgNodeBtn.addEventListener('click', ()=>{
+      const name = $('#new-org-node-name').value.trim();
+      if(!name) return;
+      const role = $('#new-org-node-role').value.trim();
+      const parentId = $('#new-org-node-parent').value || null;
+      orgNodes.push({ id:'org-'+Math.random().toString(36).slice(2,10), name, role, parentId });
+      fsSaveOrgNodes();
+      renderAdminBody();
+      renderTeamGrids();
+    });
+    $all('[data-remove-org-node]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.dataset.removeOrgNode;
+        const idx = orgNodes.findIndex(n=>n.id===id);
+        if(idx>=0) orgNodes.splice(idx,1);
+        // Kinder des gelöschten Knotens rutschen eine Ebene hoch, statt zu verwaisen
+        orgNodes.forEach(n=>{ if(n.parentId===id) n.parentId = null; });
+        fsSaveOrgNodes();
+        renderAdminBody();
+        renderTeamGrids();
+      });
+    });
+    const saveOrgNodesBtn = $('#save-org-nodes-btn');
+    if(saveOrgNodesBtn) saveOrgNodesBtn.addEventListener('click', ()=>{
+      $all('.org-node-name').forEach(inp=>{ const n = orgNodes.find(x=>x.id===inp.dataset.id); if(n) n.name = inp.value.trim(); });
+      $all('.org-node-role').forEach(inp=>{ const n = orgNodes.find(x=>x.id===inp.dataset.id); if(n) n.role = inp.value.trim(); });
+      $all('.org-node-parent').forEach(sel=>{ const n = orgNodes.find(x=>x.id===sel.dataset.id); if(n) n.parentId = sel.value || null; });
+      fsSaveOrgNodes();
+      renderAdminBody();
+      renderTeamGrids();
+      alert(fsReady ? 'Organigramm gespeichert und live synchronisiert.' : 'Organigramm gespeichert (nur für diese Sitzung/Vorführung — keine Firebase-Verbindung).');
+    });
     $all('[data-remove-partner]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         partners.splice(parseInt(btn.dataset.removePartner),1);
@@ -10248,6 +10596,50 @@ var qrcode = function() {
     return `AB-${today.getFullYear()}${p(today.getMonth()+1)}${p(today.getDate())}-${Math.floor(100+Math.random()*900)}`;
   }
 
+  // Offerte-Vorschau für eine noch offene Anfrage — nutzt dieselbe Aufbereitung wie die AB, aber mit
+  // "unverbindlich"-Framing statt "hiermit verbindlich bestätigt", solange noch nicht bestätigt/abgelehnt ist.
+  function buildOfferPreviewHtml(o, gkey){
+    const g = o.groups[gkey];
+    const groupDef = GROUPS.find(x=>x.key===gkey);
+    let rows = '', subtotal = 0;
+    const parts = o.parts.filter(p=>groupDef.services.includes(p.key));
+    parts.forEach(p=>{
+      rows += `<tr class="group-row"><td colspan="2">${p.label}</td></tr>`;
+      p.lines.forEach(l=>{ rows += `<tr><td>${l.label}</td><td class="num">${chf(l.amount)}</td></tr>`; subtotal += l.amount; });
+    });
+    const relevantKeys = groupDef.services.flatMap(s=> s==='gis' ? ['montage','sanitaer'] : [s]);
+    const leistungenHtml = leistungenBlockHtml(activeLeistungenKeys(parts), relevantKeys);
+    const netto = Math.round(subtotal*100)/100;
+    const mwst = Math.round(netto*MWST_RATE*100)/100;
+    const brutto = Math.round((netto+mwst)*100)/100;
+    const r = g.range, s=r[0], e=r[r.length-1];
+    const rangeLabel = r.length===1?fmtHumanLong(s):`${fmtHumanLong(s)} – ${fmtHumanLong(e)}`;
+    return `
+      <div class="offer-doc">
+        <div class="offer-head">
+          <img src="${SETTINGS.logoDataUrl}" alt="${SETTINGS.name}">
+          <div class="company-addr"><strong>${SETTINGS.name}</strong><br>${SETTINGS.street}<br>${SETTINGS.city}<br>Tel. ${SETTINGS.phone}<br>${SETTINGS.email}<br>${SETTINGS.uid}</div>
+        </div>
+        <div class="offer-title-row">
+          <h1>Offerte</h1>
+          <div class="offer-meta">Anfrage-Nr.: ${o.id}<br>Datum: ${fmtHumanLong(today)}<br>Status: noch nicht bestätigt</div>
+        </div>
+        <div class="offer-parties">
+          <div><div class="label">Kunde</div>${o.customer.name}<br>${o.customer.address}</div>
+          <div style="text-align:right;"><div class="label">Gewünschter Termin</div>${rangeLabel}<br>${r.length}/${g.requiredDays} Arbeitstag(e)</div>
+        </div>
+        <p style="font-size:13.5px;color:#444;margin:0 0 18px;">Unverbindliche Offerte für die angefragte Leistung — noch nicht bestätigt:</p>
+        <table class="offer-table"><thead><tr><th>Position</th><th class="num">Betrag</th></tr></thead><tbody>${rows}</tbody></table>
+        ${leistungenHtml ? `<div class="offer-period">${leistungenHtml}</div>` : ''}
+        <div class="offer-totals">
+          <div class="t-line"><span>Zwischensumme (netto)</span><span>${chf(netto)}</span></div>
+          <div class="t-line"><span>MWST ${(MWST_RATE*100).toFixed(1)}%</span><span>${chf(mwst)}</span></div>
+          <div class="t-grand"><span>Total inkl. MWST</span><span>${chf(brutto)}</span></div>
+        </div>
+        <div class="offer-period">Gewünschter Termin: <strong>${rangeLabel}</strong>. Diese Offerte ist unverbindlich, solange der Auftrag nicht bestätigt wurde.</div>
+        <div class="offer-footer">${SETTINGS.name} · ${SETTINGS.street} · ${SETTINGS.city} · ${SETTINGS.uid}</div>
+      </div>`;
+  }
   function buildABHtml(o, gkey){
     const g = o.groups[gkey];
     const groupDef = GROUPS.find(x=>x.key===gkey);
@@ -10621,6 +11013,7 @@ var qrcode = function() {
     const inv = invoices.find(i=>i.id===invId);
     const custName = inv.gkey ? orders[inv.orderId].customer.name : inv.customerName;
     const custEmail = inv.gkey ? orders[inv.orderId].customer.email : customers[inv.customerEmail].email;
+    const relevantAp = inv.kind==='final' && inv.objektKey ? abnahmeprotokolle.find(ap=>abnahmeprotokollObjektKey(ap)===inv.objektKey) : null;
     const overlay = openSimpleModal(`
       <h3 style="margin:0 0 10px;">${invoiceKindLabel(inv)} ${inv.id}</h3>
       <p class="admin-meta">${custName} · ${custEmail}</p>
@@ -10628,9 +11021,18 @@ var qrcode = function() {
         <button class="btn btn-primary btn-sm" id="invoice-pdf-btn">Als PDF speichern</button>
         <button class="btn btn-secondary btn-sm" id="invoice-mail-btn">PDF öffnen + E-Mail vorbereiten (Cc ${SETTINGS.requestEmail})</button>
       </div>
+      ${relevantAp ? `
+      <div class="admin-card" style="margin-top:14px;border-color:rgba(16,185,129,.4);">
+        <p class="admin-settings-hint" style="margin-top:0;margin-bottom:8px;">📋 Für dieses Objekt liegt ein Abnahmeprotokoll vor — soll es der Schlussrechnung beigelegt werden?</p>
+        <button class="btn btn-secondary btn-sm" id="invoice-ap-pdf-btn">📋 Abnahmeprotokoll ebenfalls als PDF öffnen</button>
+      </div>` : ''}
       <p class="admin-settings-hint" style="margin-top:10px;">Browser können PDFs aus Sicherheitsgründen nie automatisch an eine E-Mail anhängen. Der Ablauf: 1) Im Druckdialog "Als PDF speichern" wählen. 2) Im sich öffnenden Mail-Fenster die gespeicherte PDF-Datei manuell per Drag &amp; Drop oder "Datei anhängen" beifügen.</p>`);
     overlay.querySelector('#invoice-pdf-btn').addEventListener('click', ()=>{
       $('#print-area').innerHTML = buildInvoiceHtml(inv);
+      window.print();
+    });
+    if(relevantAp) overlay.querySelector('#invoice-ap-pdf-btn').addEventListener('click', ()=>{
+      $('#print-area').innerHTML = buildAbnahmeprotokollHtml(relevantAp);
       window.print();
     });
     overlay.querySelector('#invoice-mail-btn').addEventListener('click', ()=>{
@@ -11300,6 +11702,14 @@ var qrcode = function() {
         openShareModal(refType, refData, refLabel);
       });
     });
+    $all('.anfrage-pdf-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const o = orders[btn.dataset.order];
+        if(!o) return;
+        $('#print-area').innerHTML = buildOfferPreviewHtml(o, btn.dataset.group);
+        window.print();
+      });
+    });
     $all('.admin-act').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const card = btn.closest('[data-order]');
@@ -11475,15 +11885,58 @@ var qrcode = function() {
     });
     if($('#new-customer-btn')) $('#new-customer-btn').addEventListener('click', openNewCustomerModal);
     if($('#new-lieferant-btn')) $('#new-lieferant-btn').addEventListener('click', ()=> openLieferantModal());
+    $all('[data-act="toggle-lieferant"]').forEach(row=>{
+      row.addEventListener('click', ()=>{
+        const id = row.closest('[data-lieferant]').dataset.lieferant;
+        lieferantExpanded = lieferantExpanded===id ? null : id;
+        renderAdminBody();
+      });
+    });
     $all('.lieferant-edit-btn').forEach(btn=>{
-      btn.addEventListener('click', ()=> openLieferantModal(btn.dataset.id));
+      btn.addEventListener('click', (e)=>{ e.stopPropagation(); openLieferantModal(btn.dataset.id); });
     });
     $all('.lieferant-delete-btn').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
         if(!confirm('Diesen Lieferanten wirklich löschen? (Bereits erfasste Kreditorenrechnungen bleiben erhalten.)')) return;
         const idx = lieferanten.findIndex(x=>x.id===btn.dataset.id);
         if(idx>=0) lieferanten.splice(idx,1);
         fsDeleteLieferant(btn.dataset.id);
+        renderAdminBody();
+      });
+    });
+    $all('.lieferant-save-konditionen-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const l = lieferanten.find(x=>x.id===btn.dataset.id);
+        if(!l) return;
+        const field = $(`.lieferant-konditionen-field[data-id="${btn.dataset.id}"]`);
+        l.konditionen = field.value.trim();
+        fsSaveLieferant(l);
+        alert(fsReady ? 'Konditionen gespeichert und live synchronisiert.' : 'Konditionen gespeichert (nur für diese Sitzung/Vorführung — keine Firebase-Verbindung).');
+      });
+    });
+    $all('.lieferant-add-produkt-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const l = lieferanten.find(x=>x.id===btn.dataset.id);
+        if(!l) return;
+        const nameInp = $(`.new-produkt-name[data-id="${btn.dataset.id}"]`);
+        const einheitInp = $(`.new-produkt-einheit[data-id="${btn.dataset.id}"]`);
+        const ekInp = $(`.new-produkt-ek[data-id="${btn.dataset.id}"]`);
+        const name = nameInp.value.trim();
+        const ek = parseFloat(ekInp.value)||0;
+        if(!name){ alert('Bitte einen Produktnamen angeben.'); return; }
+        if(!l.produkte) l.produkte = [];
+        l.produkte.push({ id:'pr-'+Date.now(), name, einheit: einheitInp.value.trim(), ek });
+        fsSaveLieferant(l);
+        renderAdminBody();
+      });
+    });
+    $all('.lieferant-produkt-delete-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const l = lieferanten.find(x=>x.id===btn.dataset.id);
+        if(!l) return;
+        l.produkte = (l.produkte||[]).filter(p=>p.id!==btn.dataset.produkt);
+        fsSaveLieferant(l);
         renderAdminBody();
       });
     });
@@ -11524,6 +11977,14 @@ var qrcode = function() {
     if($('#log-sub-btn')) $('#log-sub-btn').addEventListener('click', openLogSubCostModal);
     if($('#add-objekt-kreditor-btn')) $('#add-objekt-kreditor-btn').addEventListener('click', ()=>{
       openAddKreditorModal(objektKey(kundenNav.customer, kundenNav.objekt), kundenNav.objekt);
+    });
+    $all('.abnahmeprotokoll-pdf-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const ap = abnahmeprotokolle.find(x=>x.id===btn.dataset.id);
+        if(!ap) return;
+        $('#print-area').innerHTML = buildAbnahmeprotokollHtml(ap);
+        window.print();
+      });
     });
     $all('.kreditor-download-pdf').forEach(btn=>{
       btn.addEventListener('click', ()=>{
@@ -11848,6 +12309,7 @@ var qrcode = function() {
 
         .search-highlight { outline: 3px solid #f59e0b !important; outline-offset: 2px; animation: searchPulse 1.5s ease-in-out 3; }
         @keyframes searchPulse { 0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,0.5);} 50%{box-shadow:0 0 0 8px rgba(245,158,11,0);} }
+        @keyframes pulse-abnahme { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.55);} 50%{box-shadow:0 0 0 7px rgba(239,68,68,0);} }
 
         .ai-import-overlay { position:fixed; inset:0; z-index:70; background:rgba(15,23,42,0.99); display:flex; flex-direction:column; }
         .ai-loading-spinner { width:40px; height:40px; border:3px solid #1e293b; border-top-color:#3b82f6; border-radius:50%; animation:spin 0.8s linear infinite; }
@@ -12665,7 +13127,259 @@ function MonteurJobSheet({ job, monteurName, team, lang, onClose }){
 }
 
 // ============================================================
-// MONTEURE ZUTEILEN — für "Froh-Tech Montage" (Froh-Tech-Erweiterung)
+// UNTERSCHRIFT — eigenes Vollbild-Fenster mit Touch-Canvas, für die
+// Abnahmeprotokoll-Unterzeichnung (Froh-Tech-Erweiterung)
+// ============================================================
+function SignaturePad({ title, subtitle, onDone, onBack }){
+    const canvasRef = useRef(null);
+    const [hasDrawn, setHasDrawn] = useState(false);
+    const [ready, setReady] = useState(false);
+    const drawing = useRef(false);
+    const lastPos = useRef({x:0,y:0});
+
+    useEffect(()=>{
+        const canvas = canvasRef.current;
+        if(!canvas) return;
+        let cancelled = false;
+        // Canvas-Grösse wird erst gesetzt, sobald das Flex-Layout tatsächlich eine Fläche > 0 hat —
+        // direkt nach einem Bildschirmwechsel (z.B. Formular -> Unterschrift) kann das erste Frame
+        // sonst noch 0×0 liefern, was zu einer leeren/nicht funktionierenden Unterschrift führen würde.
+        const setupCanvas = ()=>{
+            const rect = canvas.getBoundingClientRect();
+            if(rect.width<10 || rect.height<10){
+                if(!cancelled) requestAnimationFrame(setupCanvas);
+                return;
+            }
+            const dpr = Math.max(2, window.devicePixelRatio||2);
+            canvas.width = Math.round(rect.width * dpr);
+            canvas.height = Math.round(rect.height * dpr);
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#111827';
+            if(!cancelled) setReady(true);
+        };
+        requestAnimationFrame(setupCanvas);
+        return ()=>{ cancelled = true; };
+    }, []);
+
+    const getPos = (e)=>{
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    };
+    const start = (e)=>{ if(!ready) return; e.preventDefault(); drawing.current = true; lastPos.current = getPos(e); setHasDrawn(true); };
+    const move = (e)=>{
+        if(!drawing.current) return;
+        e.preventDefault();
+        const ctx = canvasRef.current.getContext('2d');
+        const pos = getPos(e);
+        ctx.beginPath(); ctx.moveTo(lastPos.current.x, lastPos.current.y); ctx.lineTo(pos.x, pos.y); ctx.stroke();
+        lastPos.current = pos;
+    };
+    const end = ()=>{ drawing.current = false; };
+    const clear = ()=>{
+        const canvas = canvasRef.current;
+        canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+        setHasDrawn(false);
+    };
+    const finish = ()=>{
+        if(!hasDrawn) return;
+        const dataUrl = canvasRef.current.toDataURL('image/png');
+        if(dataUrl.length < 1000){
+            // Auffällig kurze Daten-URL deutet auf eine leere/fehlerhafte Aufnahme hin (z.B. 0×0-Canvas) —
+            // lieber nochmals zeichnen lassen, als eine unsichtbare Unterschrift zu speichern.
+            alert('Die Unterschrift konnte nicht richtig erfasst werden. Bitte nochmals zeichnen.');
+            clear();
+            return;
+        }
+        onDone(dataUrl);
+    };
+
+    return (
+        <div style={{position:'fixed',inset:0,zIndex:95,background:'#0f172a',display:'flex',flexDirection:'column'}}>
+            <div style={{padding:'16px 18px',borderBottom:'1px solid rgba(255,255,255,0.08)',flexShrink:0}}>
+                <div style={{color:'#fff',fontSize:15,fontWeight:900}}>✍️ {title}</div>
+                {subtitle && <div style={{color:'#94a3b8',fontSize:12,marginTop:3}}>{subtitle}</div>}
+            </div>
+            <div style={{flex:1,position:'relative',background:'#fff',margin:'14px 18px',borderRadius:14,overflow:'hidden',border:'2px solid #334155'}}>
+                <canvas ref={canvasRef}
+                    onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
+                    onTouchStart={start} onTouchMove={move} onTouchEnd={end}
+                    style={{width:'100%',height:'100%',touchAction:'none',display:'block'}}/>
+                {!hasDrawn && <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',color:'#cbd5e1',fontSize:13,fontWeight:700,pointerEvents:'none'}}>Hier mit dem Finger unterschreiben</div>}
+            </div>
+            <div style={{padding:'14px 18px',display:'flex',gap:10,flexShrink:0,paddingBottom:'calc(14px + env(safe-area-inset-bottom, 0px))'}}>
+                {onBack && <button onClick={onBack} style={{padding:'14px 16px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:14,color:'#64748b',fontWeight:900,fontSize:11,textTransform:'uppercase',cursor:'pointer'}}>Zurück</button>}
+                <button onClick={clear} style={{padding:'14px 16px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:14,color:'#64748b',fontWeight:900,fontSize:11,textTransform:'uppercase',cursor:'pointer'}}>Löschen</button>
+                <button onClick={finish} disabled={!hasDrawn} style={{flex:1,padding:'14px',background:hasDrawn?'#10b981':'#1e293b',border:'none',borderRadius:14,color:hasDrawn?'#fff':'#475569',fontWeight:900,fontSize:11,textTransform:'uppercase',cursor:hasDrawn?'pointer':'not-allowed'}}>✓ Übernehmen</button>
+            </div>
+        </div>
+    );
+}
+
+// ============================================================
+// ABNAHMEPROTOKOLL — vollständiges digitales Protokoll (Vorwandsysteme),
+// inkl. Checkliste, Mängeltabelle und zwei Touch-Unterschriften.
+// Wird nach Objekt/Auftrag im Webtool abgelegt (Firestore: abnahmeprotokolle).
+// (Froh-Tech-Erweiterung)
+// ============================================================
+const ABNAHME_PRUEFPUNKTE = [
+    'Raummasse laut Detailplan eingehalten',
+    'Vorwände im Blei erstellt',
+    'Befestigungsabstände laut Hersteller eingehalten',
+    'Vorwände im Winkel',
+    'Alle relevanten Höhen eingehalten (Anschlüsse, Nischen etc.)',
+    'Montagewinkel vom Bauwerk entkoppelt',
+    'Kein direkter Kontakt vom Vorwandsystem zum Bauwerk',
+    'Vorwand mit Gips / Mörtel verunreinigt',
+];
+function AbnahmeModal({ job, monteurName, team, onClose }){
+    const [step, setStep] = useState('form'); // 'form' | 'sign1' | 'sign2'
+    const [saving, setSaving] = useState(false);
+    const [form, setForm] = useState({
+        objekt: job.customer||'', adresse: job.address||'', kunde: job.customer||'', wohnungen:'',
+        datum: new Date().toISOString().slice(0,10),
+        system: 'duofix', systemSonstiges:'',
+        checkliste: Object.fromEntries(ABNAHME_PRUEFPUNKTE.map(p=>[p,null])), // null|'ja'|'nein'
+        maengel: [{ anlageteil:'', mangel:'', vorgehen:'' }],
+        unterschriftFrohTechName: monteurName||'',
+        unterschriftPLName: '',
+    });
+    const [sig1, setSig1] = useState(null);
+    const [sig2, setSig2] = useState(null);
+
+    const setField = (k,v)=> setForm(f=>({...f,[k]:v}));
+    const setCheck = (p,v)=> setForm(f=>({...f, checkliste:{...f.checkliste, [p]:v}}));
+    const addMangelRow = ()=> setForm(f=>({...f, maengel:[...f.maengel, {anlageteil:'',mangel:'',vorgehen:''}]}));
+    const removeMangelRow = (i)=> setForm(f=>({...f, maengel: f.maengel.filter((_,idx)=>idx!==i)}));
+    const setMangelField = (i,k,v)=> setForm(f=>({...f, maengel: f.maengel.map((m,idx)=> idx===i?{...m,[k]:v}:m)}));
+
+    const allChecked = ABNAHME_PRUEFPUNKTE.every(p=> form.checkliste[p]!==null);
+
+    const finalize = async (secondSig)=>{
+        setSaving(true);
+        try{
+            const { db, doc, setDoc, updateDoc } = window.FirebaseSDK;
+            const id = `ap-${job.id}`;
+            await setDoc(doc(db, 'abnahmeprotokolle', id), {
+                id, entryId: job.id, auftragsNr: job.auftragsNr||'', team: team.id,
+                objekt: form.objekt, adresse: form.adresse, kunde: form.kunde, wohnungen: form.wohnungen,
+                datum: form.datum, system: form.system, systemSonstiges: form.systemSonstiges,
+                checkliste: form.checkliste, maengel: form.maengel.filter(m=>m.anlageteil||m.mangel||m.vorgehen),
+                unterschriftFrohTechName: form.unterschriftFrohTechName, unterschriftFrohText: sig1,
+                unterschriftPLName: form.unterschriftPLName, unterschriftPL: secondSig,
+                createdAt: new Date().toISOString(), erstelltVon: monteurName||'',
+            }, {merge:true});
+            await updateDoc(doc(db, `teams_cal_${team.id}`, job.id), { abnahmeStatus:'done', abnahmeAt:new Date().toISOString() });
+        }catch(e){ console.warn('Abnahmeprotokoll speichern fehlgeschlagen', e); alert('Speichern fehlgeschlagen — bitte nochmals versuchen.'); setSaving(false); return; }
+        setSaving(false);
+        onClose();
+    };
+
+    if(step==='sign1'){
+        return <SignaturePad key="sign1" title="Unterschrift Froh-Tech" subtitle={form.unterschriftFrohTechName||monteurName}
+            onBack={()=>setStep('form')} onDone={(dataUrl)=>{ setSig1(dataUrl); setStep('sign2'); }}/>;
+    }
+    if(step==='sign2'){
+        return <SignaturePad key="sign2" title="Unterschrift PL Sanitär / Kunde" subtitle={form.unterschriftPLName||'—'}
+            onBack={()=>setStep('sign1')} onDone={(dataUrl)=>{ setSig2(dataUrl); finalize(dataUrl); }}/>;
+    }
+
+    const inputStyle = {width:'100%',background:'#0d1420',border:'1.5px solid rgba(255,255,255,0.12)',borderRadius:10,padding:'10px 12px',color:'#e2e8f0',fontSize:13.5,boxSizing:'border-box',outline:'none'};
+    const labelStyle = {color:'#94a3b8',fontSize:10.5,fontWeight:800,textTransform:'uppercase',letterSpacing:.5,marginBottom:5,display:'block'};
+
+    return (
+        <div style={{position:'fixed',inset:0,zIndex:90,background:'rgba(2,6,15,0.85)',display:'flex',flexDirection:'column',justifyContent:'flex-end'}} onClick={onClose}>
+            <div onClick={e=>e.stopPropagation()} style={{background:'#182335',borderRadius:'18px 18px 0 0',maxHeight:'92vh',overflowY:'auto',boxShadow:'0 -4px 24px rgba(0,0,0,.5)'}}>
+                <div style={{width:36,height:4,background:'#334155',borderRadius:2,margin:'10px auto 4px'}}></div>
+                <div style={{padding:'10px 18px 4px'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
+                        <div style={{width:34,height:34,borderRadius:10,background:'rgba(239,68,68,0.18)',border:'1.5px solid #ef4444',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flex:'0 0 auto'}}>📋</div>
+                        <div>
+                            <div style={{color:'#f87171',fontSize:9,fontWeight:900,textTransform:'uppercase',letterSpacing:1.5}}>Abnahmeprotokoll</div>
+                            <div style={{color:'#fff',fontSize:14,fontWeight:800,marginTop:1}}>Vorwandsysteme</div>
+                        </div>
+                    </div>
+
+                    <div style={{color:'#cbd5e1',fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:.5,margin:'6px 0 8px'}}>Projekt &amp; Ansprechpartner</div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
+                        <div><label style={labelStyle}>Objekt</label><input style={inputStyle} value={form.objekt} onChange={e=>setField('objekt',e.target.value)}/></div>
+                        <div><label style={labelStyle}>Datum</label><input type="date" style={inputStyle} value={form.datum} onChange={e=>setField('datum',e.target.value)}/></div>
+                        <div><label style={labelStyle}>Kunde</label><input style={inputStyle} value={form.kunde} onChange={e=>setField('kunde',e.target.value)}/></div>
+                        <div><label style={labelStyle}>Wohnungen</label><input style={inputStyle} placeholder="z. B. 3.OG links, 4.OG rechts" value={form.wohnungen} onChange={e=>setField('wohnungen',e.target.value)}/></div>
+                    </div>
+                    <div style={{gridColumn:'1/-1',marginBottom:14}}>
+                        <label style={labelStyle}>Adresse</label>
+                        <input style={inputStyle} value={form.adresse} onChange={e=>setField('adresse',e.target.value)}/>
+                    </div>
+
+                    <div style={{color:'#cbd5e1',fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:.5,margin:'6px 0 8px'}}>System</div>
+                    <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
+                        {[['duofix','Geberit Duofix'],['gis','Geberit GIS'],['sonstiges','Sonstiges']].map(([val,lbl])=>(
+                            <button key={val} onClick={()=>setField('system',val)}
+                                style={{padding:'9px 14px',borderRadius:10,fontSize:12,fontWeight:800,cursor:'pointer',border:form.system===val?'2px solid #3b82f6':'1.5px solid rgba(255,255,255,0.12)',background:form.system===val?'rgba(59,130,246,0.18)':'#0d1420',color:form.system===val?'#93c5fd':'#94a3b8'}}>
+                                {lbl}
+                            </button>
+                        ))}
+                    </div>
+                    {form.system==='sonstiges' && (
+                        <div style={{marginBottom:14}}><input style={inputStyle} placeholder="System angeben" value={form.systemSonstiges} onChange={e=>setField('systemSonstiges',e.target.value)}/></div>
+                    )}
+
+                    <div style={{color:'#cbd5e1',fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:.5,margin:'6px 0 8px'}}>Montage &amp; Schallschutz</div>
+                    <div style={{display:'flex',flexDirection:'column',gap:7,marginBottom:16}}>
+                        {ABNAHME_PRUEFPUNKTE.map(p=>(
+                            <div key={p} style={{display:'flex',alignItems:'center',gap:10,background:'#0d1420',borderRadius:10,padding:'9px 12px'}}>
+                                <div style={{flex:1,color:'#e2e8f0',fontSize:12.5,fontWeight:600,lineHeight:1.3}}>{p}</div>
+                                <div style={{display:'flex',gap:6,flex:'0 0 auto'}}>
+                                    <button onClick={()=>setCheck(p,'ja')} style={{width:44,padding:'7px 0',borderRadius:8,border:'none',fontWeight:900,fontSize:11.5,cursor:'pointer',background:form.checkliste[p]==='ja'?'#10b981':'#1e293b',color:form.checkliste[p]==='ja'?'#fff':'#475569'}}>Ja</button>
+                                    <button onClick={()=>setCheck(p,'nein')} style={{width:52,padding:'7px 0',borderRadius:8,border:'none',fontWeight:900,fontSize:11.5,cursor:'pointer',background:form.checkliste[p]==='nein'?'#ef4444':'#1e293b',color:form.checkliste[p]==='nein'?'#fff':'#475569'}}>Nein</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',margin:'6px 0 8px'}}>
+                        <div style={{color:'#cbd5e1',fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:.5}}>Mängel &amp; weiteres Vorgehen</div>
+                        <button onClick={addMangelRow} style={{background:'rgba(59,130,246,0.14)',border:'1px solid #3b82f6',borderRadius:8,color:'#93c5fd',fontSize:10.5,fontWeight:800,padding:'5px 10px',cursor:'pointer'}}>+ Zeile</button>
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:16}}>
+                        {form.maengel.map((m,i)=>(
+                            <div key={i} style={{background:'#0d1420',borderRadius:10,padding:'10px 12px',position:'relative'}}>
+                                {form.maengel.length>1 && <button onClick={()=>removeMangelRow(i)} style={{position:'absolute',top:8,right:8,background:'none',border:'none',color:'#64748b',fontSize:14,cursor:'pointer'}}>✕</button>}
+                                <input style={{...inputStyle,marginBottom:7}} placeholder="Anlageteil" value={m.anlageteil} onChange={e=>setMangelField(i,'anlageteil',e.target.value)}/>
+                                <input style={{...inputStyle,marginBottom:7}} placeholder="Mangel / Feststellung" value={m.mangel} onChange={e=>setMangelField(i,'mangel',e.target.value)}/>
+                                <input style={inputStyle} placeholder="Weiteres Vorgehen" value={m.vorgehen} onChange={e=>setMangelField(i,'vorgehen',e.target.value)}/>
+                            </div>
+                        ))}
+                    </div>
+                    <div style={{color:'#64748b',fontSize:10.5,fontStyle:'italic',marginBottom:16}}>★ Ohne Mängel gehen alle Vorwände in die Obhut des Sanitärinstallateurs über.</div>
+
+                    <div style={{color:'#cbd5e1',fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:.5,margin:'6px 0 8px'}}>Unterschriften</div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:6}}>
+                        <div><label style={labelStyle}>Froh-Tech</label><input style={inputStyle} value={form.unterschriftFrohTechName} onChange={e=>setField('unterschriftFrohTechName',e.target.value)}/></div>
+                        <div><label style={labelStyle}>PL Sanitär / Kunde</label><input style={inputStyle} value={form.unterschriftPLName} onChange={e=>setField('unterschriftPLName',e.target.value)}/></div>
+                    </div>
+                </div>
+                <div style={{padding:'14px 18px',borderTop:'1px solid rgba(255,255,255,0.08)',background:'#0f172a',display:'flex',gap:10,paddingBottom:'calc(14px + env(safe-area-inset-bottom, 0px))'}}>
+                    <button onClick={onClose} style={{padding:'14px 16px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:14,color:'#64748b',fontWeight:900,fontSize:11,textTransform:'uppercase',cursor:'pointer'}}>Abbrechen</button>
+                    <button onClick={()=>setStep('sign1')} disabled={!allChecked || !form.unterschriftFrohTechName || !form.unterschriftPLName || saving}
+                        style={{flex:1,padding:'14px',background:(allChecked&&form.unterschriftFrohTechName&&form.unterschriftPLName&&!saving)?'#ef4444':'#1e293b',border:'none',borderRadius:14,color:(allChecked&&form.unterschriftFrohTechName&&form.unterschriftPLName&&!saving)?'#fff':'#475569',fontWeight:900,fontSize:11,textTransform:'uppercase',cursor:(allChecked&&form.unterschriftFrohTechName&&form.unterschriftPLName)?'pointer':'not-allowed'}}>
+                        ✍️ Weiter zur Unterschrift
+                    </button>
+                </div>
+                {!allChecked && <div style={{color:'#fca5a5',fontSize:10.5,textAlign:'center',padding:'0 18px 12px'}}>Bitte alle Prüfpunkte mit Ja/Nein beantworten.</div>}
+            </div>
+        </div>
+    );
+}
+
+
 // ============================================================
 function AssignMonteurModal({ entry, monteurs, team, onClose }) {
     const [selected, setSelected] = useState(entry.assignedMonteure||[]);
@@ -13929,6 +14643,7 @@ function CalendarView({ team, teams=[], onBack, isAdminAccess=false, isMontageFi
     const [hoursQueue, setHoursQueue] = useState(null); // {entry} — wartet auf Stundenerfassung
     const [selectedMonteur, setSelectedMonteur] = useState(null);
     const [monteurListJob, setMonteurListJob] = useState(null);
+    const [abnahmeJob, setAbnahmeJob] = useState(null);
     const [assignEntry, setAssignEntry] = useState(null);
     const isMonteurPickerTeam = isMontageFilterTeam;
 
@@ -14189,7 +14904,10 @@ function CalendarView({ team, teams=[], onBack, isAdminAccess=false, isMontageFi
             if(!(e.assignedMonteure||[]).includes(selectedMonteur)) return false;
             if((e.deliveryDate||'').substring(0,10) > unlockedDateStr) return false;
             const target = parseInt(e.target)||0;
-            if(target>0 && (e.installedQty||0)>=target && !e.isBlocked) return false;
+            const fertig = target>0 && (e.installedQty||0)>=target && !e.isBlocked;
+            // Fertige Aufträge verschwinden erst aus der Liste, wenn auch das Abnahmeprotokoll erledigt ist —
+            // sonst würde die Abnahme-Erinnerung nie angezeigt werden können.
+            if(fertig && e.abnahmeStatus==='done') return false;
             return true;
         }).sort((a,b)=> (a.deliveryDate||'').localeCompare(b.deliveryDate||''));
         const dayKeys = ['dayMon','dayTue','dayWed','dayThu','dayFri','daySat'];
@@ -14233,6 +14951,9 @@ function CalendarView({ team, teams=[], onBack, isAdminAccess=false, isMontageFi
                             const isBlocked = e.isBlocked;
                             const bg = isBlocked?'#3f1414':'#1e293b'; const border = isBlocked?'#ef4444':CARD_BORDER[ci]; const accent = isBlocked?'#fca5a5':CARD_BORDER[ci];
                             const target = parseInt(e.target)||0;
+                            const lastDayStr = (e.endDate || e.deliveryDate || '').substring(0,10);
+                            const alleElementeMontiert = target>0 && (e.installedQty||0)>=target;
+                            const needsAbnahme = !isBlocked && e.abnahmeStatus!=='done' && (alleElementeMontiert || (lastDayStr && unlockedDateStr >= lastDayStr));
                             return (
                                 <div key={e.id} style={{background:bg,borderLeft:'4px solid '+border,borderRadius:12,padding:'12px 14px',boxShadow:'0 1px 4px rgba(0,0,0,.3)'}}>
                                     <div onClick={()=>setMonteurListJob(e)} style={{cursor:'pointer'}}>
@@ -14244,6 +14965,12 @@ function CalendarView({ team, teams=[], onBack, isAdminAccess=false, isMontageFi
                                         <div style={{color:'#94a3b8',fontSize:11,marginTop:5}}>{mt(frohLang,'orderNr')}: {e.auftragsNr||'—'} · {new Date(e.deliveryDate).toLocaleDateString(frohLang)}</div>
                                         {target>0 && <div style={{color:accent,fontWeight:800,fontSize:13,marginTop:6}}>{e.installedQty||0}/{target} {mt(frohLang,'elementsInstalled')}</div>}
                                     </div>
+                                    {needsAbnahme && (
+                                        <div onClick={()=>setAbnahmeJob(e)} style={{marginTop:9,background:'#7f1d1d',border:'2px solid #ef4444',borderRadius:9,padding:'9px 10px',cursor:'pointer',animation:'pulse-abnahme 2s infinite'}}>
+                                            <div style={{color:'#fecaca',fontWeight:900,fontSize:12.5,textAlign:'center',letterSpacing:.5}}>⚠️ ABNAHME MUSS GEMACHT WERDEN HEUTE</div>
+                                            <div style={{color:'#fca5a5',fontSize:10,textAlign:'center',marginTop:3,fontWeight:700}}>Antippen zum Ausfüllen</div>
+                                        </div>
+                                    )}
                                     {e.address && (
                                         <a href={mapsUrl(e.address)} target="_blank" rel="noopener noreferrer" onClick={ev=>ev.stopPropagation()}
                                             style={{display:'flex',alignItems:'center',gap:6,marginTop:9,paddingTop:9,borderTop:'1px solid rgba(255,255,255,0.08)',color:'#60a5fa',fontSize:11.5,fontWeight:700,textDecoration:'none'}}>
@@ -14257,6 +14984,9 @@ function CalendarView({ team, teams=[], onBack, isAdminAccess=false, isMontageFi
                 </div>
                 {monteurListJob && (
                     <MonteurJobSheet job={monteurListJob} monteurName={selectedMonteur} team={team} lang={frohLang} onClose={()=>setMonteurListJob(null)}/>
+                )}
+                {abnahmeJob && (
+                    <AbnahmeModal job={abnahmeJob} monteurName={selectedMonteur} team={team} onClose={()=>setAbnahmeJob(null)}/>
                 )}
             </div>
         );
