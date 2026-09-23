@@ -742,8 +742,8 @@
         <div class="nav-dropdown-menu">
           <div class="nav-dropdown-menu-inner">
             <a href="#leitbild" data-i18n="nav.leitbild">Leitbild</a>
-            <a href="#organigramm" data-i18n="nav.organigramm" id="nav-link-organigramm">Organigramm</a>
-            <a href="#team" data-i18n="nav.team" id="nav-link-team">Team</a>
+            <a href="#organigramm" data-i18n="nav.organigramm" id="nav-link-organigramm" style="display:none;">Organigramm</a>
+            <a href="#team" data-i18n="nav.team" id="nav-link-team" style="display:none;">Team</a>
             <a href="#jobs" data-i18n="nav.jobs">Jobs</a>
           </div>
         </div>
@@ -1108,7 +1108,7 @@
   </div>
 </section>
 
-<section id="organigramm">
+<section id="organigramm" style="display:none;">
   <div class="container">
     <div class="section-head">
       <div class="kicker" data-i18n="nav.unternehmen">Unternehmen</div>
@@ -1119,7 +1119,7 @@
   </div>
 </section>
 
-<section id="team" class="section-soft">
+<section id="team" class="section-soft" style="display:none;">
   <div class="container">
     <div class="section-head">
       <div class="kicker" data-i18n="nav.unternehmen">Unternehmen</div>
@@ -7947,7 +7947,7 @@ var qrcode = function() {
     const abnahmeprotokolleHtml = objektAbnahmeprotokolle.length ? objektAbnahmeprotokolle.map(ap=>{
       const maengelCount = (ap.maengel||[]).length;
       return `<div class="obj-list-item">
-        <span>📋 Abnahmeprotokoll vom ${ap.datum?new Date(ap.datum).toLocaleDateString('de-CH'):'—'} · ${ap.unterschriftFrohTechName||'—'}${maengelCount?` · <span style="color:#f59e0b;">⚠️ ${maengelCount} Mangel${maengelCount!==1?'-Positionen':''}</span>`:' · ✅ ohne Mängel'}</span>
+        <span>📋 Abnahmeprotokoll vom ${ap.datum?new Date(ap.datum).toLocaleDateString('de-CH'):'—'} · ${ap.unterschriftFrohTechName||'—'}${maengelCount?` · <span style="color:#f59e0b;">⚠️ ${maengelCount} Mangel${maengelCount!==1?'-Positionen':''}</span>`:' · ✅ ohne Mängel'}${ap.keinSanitaerAnwesend?' · <span style="color:#dc3545;">⚠️ ohne PL-Unterschrift</span>':''}</span>
         <button class="obj-mini abnahmeprotokoll-pdf-btn" data-id="${ap.id}">📄 Als PDF exportieren</button>
       </div>`;
     }).join('') : '<div class="obj-empty">Noch kein Abnahmeprotokoll für dieses Objekt.</div>';
@@ -9540,7 +9540,7 @@ var qrcode = function() {
               <div style="font-size:9.5px;color:#999;">${ap.unterschriftFrohTechName?ap.unterschriftFrohTechName+' — ':''}Name / Unterschrift / Datum</div>
             </td>
             <td style="width:50%;vertical-align:bottom;">
-              <div style="height:58px;display:flex;align-items:flex-end;">${ap.unterschriftPL ? `<img src="${ap.unterschriftPL}" style="max-width:200px;max-height:54px;">` : ''}</div>
+              <div style="height:58px;display:flex;align-items:flex-end;">${ap.unterschriftPL ? `<img src="${ap.unterschriftPL}" style="max-width:200px;max-height:54px;">` : (ap.keinSanitaerAnwesend ? `<div style="font-size:11px;color:#b91c1c;font-style:italic;">Niemand anwesend / nicht unterschrieben</div>` : '')}</div>
               <div style="border-top:1.5px solid #333;padding-top:6px;margin-top:4px;font-size:11.5px;color:${AP_BLUE_DARK};font-weight:700;">PL Sanitär</div>
               <div style="font-size:9.5px;color:#999;">${ap.unterschriftPLName?ap.unterschriftPLName+' — ':''}Name / Unterschrift / Datum</div>
             </td>
@@ -13252,6 +13252,7 @@ function AbnahmeModal({ job, monteurName, team, onClose }){
     });
     const [sig1, setSig1] = useState(null);
     const [sig2, setSig2] = useState(null);
+    const [keinSanitaer, setKeinSanitaer] = useState(false); // Niemand anwesend / wollte nicht unterschreiben
 
     const setField = (k,v)=> setForm(f=>({...f,[k]:v}));
     const setCheck = (p,v)=> setForm(f=>({...f, checkliste:{...f.checkliste, [p]:v}}));
@@ -13260,8 +13261,13 @@ function AbnahmeModal({ job, monteurName, team, onClose }){
     const setMangelField = (i,k,v)=> setForm(f=>({...f, maengel: f.maengel.map((m,idx)=> idx===i?{...m,[k]:v}:m)}));
 
     const allChecked = ABNAHME_PRUEFPUNKTE.every(p=> form.checkliste[p]!==null);
+    const canProceedToSign = allChecked && form.unterschriftFrohTechName && (keinSanitaer || form.unterschriftPLName) && !saving;
 
     const finalize = async (secondSig)=>{
+        // Harte Absicherung: eine Abnahme darf nie ohne Froh-Tech-Unterschrift gespeichert werden,
+        // und eine PL-Unterschrift nur fehlen, wenn das bewusst über "Niemand anwesend" markiert wurde.
+        if(!sig1){ alert('Die Unterschrift von Froh-Tech fehlt — bitte nochmals versuchen.'); setStep('sign1'); return; }
+        if(!keinSanitaer && !secondSig){ alert('Die Unterschrift von PL Sanitär fehlt — bitte nochmals versuchen oder "Niemand anwesend" auswählen.'); setStep('form'); return; }
         setSaving(true);
         try{
             const { db, doc, setDoc, updateDoc } = window.FirebaseSDK;
@@ -13272,7 +13278,9 @@ function AbnahmeModal({ job, monteurName, team, onClose }){
                 datum: form.datum, system: form.system, systemSonstiges: form.systemSonstiges,
                 checkliste: form.checkliste, maengel: form.maengel.filter(m=>m.anlageteil||m.mangel||m.vorgehen),
                 unterschriftFrohTechName: form.unterschriftFrohTechName, unterschriftFrohText: sig1,
-                unterschriftPLName: form.unterschriftPLName, unterschriftPL: secondSig,
+                unterschriftPLName: keinSanitaer ? '' : form.unterschriftPLName,
+                unterschriftPL: keinSanitaer ? null : secondSig,
+                keinSanitaerAnwesend: !!keinSanitaer,
                 createdAt: new Date().toISOString(), erstelltVon: monteurName||'',
             }, {merge:true});
             await updateDoc(doc(db, `teams_cal_${team.id}`, job.id), { abnahmeStatus:'done', abnahmeAt:new Date().toISOString() });
@@ -13283,7 +13291,7 @@ function AbnahmeModal({ job, monteurName, team, onClose }){
 
     if(step==='sign1'){
         return <SignaturePad key="sign1" title="Unterschrift Froh-Tech" subtitle={form.unterschriftFrohTechName||monteurName}
-            onBack={()=>setStep('form')} onDone={(dataUrl)=>{ setSig1(dataUrl); setStep('sign2'); }}/>;
+            onBack={()=>setStep('form')} onDone={(dataUrl)=>{ setSig1(dataUrl); if(keinSanitaer){ finalize(null); } else { setStep('sign2'); } }}/>;
     }
     if(step==='sign2'){
         return <SignaturePad key="sign2" title="Unterschrift PL Sanitär / Kunde" subtitle={form.unterschriftPLName||'—'}
@@ -13361,16 +13369,23 @@ function AbnahmeModal({ job, monteurName, team, onClose }){
                     <div style={{color:'#64748b',fontSize:10.5,fontStyle:'italic',marginBottom:16}}>★ Ohne Mängel gehen alle Vorwände in die Obhut des Sanitärinstallateurs über.</div>
 
                     <div style={{color:'#cbd5e1',fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:.5,margin:'6px 0 8px'}}>Unterschriften</div>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:6}}>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
                         <div><label style={labelStyle}>Froh-Tech</label><input style={inputStyle} value={form.unterschriftFrohTechName} onChange={e=>setField('unterschriftFrohTechName',e.target.value)}/></div>
-                        <div><label style={labelStyle}>PL Sanitär / Kunde</label><input style={inputStyle} value={form.unterschriftPLName} onChange={e=>setField('unterschriftPLName',e.target.value)}/></div>
+                        <div>
+                            <label style={labelStyle}>PL Sanitär / Kunde</label>
+                            <input style={{...inputStyle, opacity:keinSanitaer?0.4:1}} disabled={keinSanitaer} value={form.unterschriftPLName} onChange={e=>setField('unterschriftPLName',e.target.value)}/>
+                        </div>
                     </div>
+                    <label onClick={()=>setKeinSanitaer(k=>!k)} style={{display:'flex',alignItems:'center',gap:9,cursor:'pointer',background:keinSanitaer?'rgba(239,68,68,0.12)':'#0d1420',border:`1.5px solid ${keinSanitaer?'#ef4444':'rgba(255,255,255,0.12)'}`,borderRadius:10,padding:'10px 12px',marginBottom:16}}>
+                        <span style={{width:18,height:18,flex:'0 0 auto',borderRadius:5,border:`2px solid ${keinSanitaer?'#ef4444':'#475569'}`,background:keinSanitaer?'#ef4444':'transparent',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:900}}>{keinSanitaer?'✓':''}</span>
+                        <span style={{color:keinSanitaer?'#fca5a5':'#94a3b8',fontSize:12,fontWeight:700}}>Niemand anwesend / möchte nicht unterschreiben</span>
+                    </label>
                 </div>
                 <div style={{padding:'14px 18px',borderTop:'1px solid rgba(255,255,255,0.08)',background:'#0f172a',display:'flex',gap:10,paddingBottom:'calc(14px + env(safe-area-inset-bottom, 0px))'}}>
                     <button onClick={onClose} style={{padding:'14px 16px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:14,color:'#64748b',fontWeight:900,fontSize:11,textTransform:'uppercase',cursor:'pointer'}}>Abbrechen</button>
-                    <button onClick={()=>setStep('sign1')} disabled={!allChecked || !form.unterschriftFrohTechName || !form.unterschriftPLName || saving}
-                        style={{flex:1,padding:'14px',background:(allChecked&&form.unterschriftFrohTechName&&form.unterschriftPLName&&!saving)?'#ef4444':'#1e293b',border:'none',borderRadius:14,color:(allChecked&&form.unterschriftFrohTechName&&form.unterschriftPLName&&!saving)?'#fff':'#475569',fontWeight:900,fontSize:11,textTransform:'uppercase',cursor:(allChecked&&form.unterschriftFrohTechName&&form.unterschriftPLName)?'pointer':'not-allowed'}}>
-                        ✍️ Weiter zur Unterschrift
+                    <button onClick={()=>setStep('sign1')} disabled={!canProceedToSign}
+                        style={{flex:1,padding:'14px',background:canProceedToSign?'#ef4444':'#1e293b',border:'none',borderRadius:14,color:canProceedToSign?'#fff':'#475569',fontWeight:900,fontSize:11,textTransform:'uppercase',cursor:canProceedToSign?'pointer':'not-allowed'}}>
+                        ✍️ Weiter zur Unterschrift{keinSanitaer?' (nur Froh-Tech)':''}
                     </button>
                 </div>
                 {!allChecked && <div style={{color:'#fca5a5',fontSize:10.5,textAlign:'center',padding:'0 18px 12px'}}>Bitte alle Prüfpunkte mit Ja/Nein beantworten.</div>}
